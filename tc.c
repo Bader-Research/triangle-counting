@@ -58,8 +58,8 @@ int check_triangleCount(GRAPH_TYPE *graph, INT_t numTriangles) {
 void copy_graph(GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
   dstGraph->numVertices = srcGraph->numVertices;
   dstGraph->numEdges = srcGraph->numEdges;
-  bcopy(srcGraph->rowPtr, dstGraph->rowPtr, (srcGraph->numVertices + 1) * sizeof(INT_t));
-  bcopy(srcGraph->colInd, dstGraph->colInd, srcGraph->numEdges * sizeof(INT_t));
+  memcpy(dstGraph->rowPtr, srcGraph->rowPtr, (srcGraph->numVertices + 1) * sizeof(INT_t));
+  memcpy(dstGraph->colInd, srcGraph->colInd, srcGraph->numEdges * sizeof(INT_t));
 }
 
 void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
