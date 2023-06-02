@@ -82,6 +82,7 @@ void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
     allocate_graph(graph);
 }
 
+
 void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
     INT_t numVertices = graph->numVertices;
@@ -95,7 +96,6 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
     srand(time(NULL));
 
     rowPtr[0] = 0;
-    rowPtr[numVertices] = numEdges;
 
     // Generate the edges
     for (INT_t e = 0; e < numEdges; e++) {
@@ -142,7 +142,6 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
             }
         }
     }
-
 
     free(degree);
 }
@@ -266,8 +265,8 @@ main(int argc, char **argv) {
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  fprintf(stdout," scale: %2d \t  tc_chatGPT: %f\n",
-	  scale,total_time);
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_chatGPT: %f\n",
+	  scale,numTriangles,total_time);
 
 /******************************************************************/
 
