@@ -55,6 +55,12 @@ int check_triangleCount(GRAPH_TYPE *graph, INT_t numTriangles) {
 }
 
 
+void copy_graph(GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
+  dstGraph->numVertices = srcGraph->numVertices;
+  dstGraph->numEdges = srcGraph->numEdges;
+  bcopy(srcGraph->rowPtr, dstGraph->rowPtr, (srcGraph->numVertices + 1) * sizeof(INT_t));
+  bcopy(srcGraph->colInd, dstGraph->colInd, srcGraph->numEdges * sizeof(INT_t));
+}
 
 void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
     INT_t numVertices = 1 << scale;
@@ -222,30 +228,28 @@ main(int argc, char **argv) {
   fprintf(stdout,"Scale [%2d]\n",scale);
   
   
-  graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-
-  
-  srandom(time(0));
+  assert_malloc(originalGraph);
 
   create_graph_RMAT(originalGraph, scale, EDGE_FACTOR);
 
+  graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph);
+  allocate_graph_RMAT(scale, EDGE_FACTOR, graph);
+  
   /* From ChatGPT 
     // Example CSR graph representation
     int num_vertices = 5;
     int num_edges = 6;
     int row_ptr[] = {0, 2, 5, 7, 9, 11};
     int col_ind[] = {1, 2, 0, 2, 3, 0, 1, 3, 1, 4, 2, 4};
-
-    // Count triangles in the graph
-    int num_triangles = countTrianglesCSR(row_ptr, col_ind, num_vertices);
   */
 
 /******************************************************************/
 
   total_time = get_seconds();
   for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    bcopy(originalGraph,graph, 0 /* size of data structure */);
+    copy_graph(originalGraph, graph);
     numTriangles = tc_chatGPT(graph);
   }
   total_time = get_seconds() - total_time;
@@ -254,7 +258,7 @@ main(int argc, char **argv) {
 
   over_time = get_seconds();
   for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    bcopy(originalGraph,graph, 0 /* size of data structure */);
+    copy_graph(originalGraph, graph);
   }
   over_time = get_seconds() - over_time;
 
