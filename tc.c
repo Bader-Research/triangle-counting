@@ -62,24 +62,28 @@ void copy_graph(GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
   memcpy(dstGraph->colInd, srcGraph->colInd, srcGraph->numEdges * sizeof(INT_t));
 }
 
-void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
-    INT_t numVertices = 1 << scale;
-    INT_t numEdges = numVertices * edgeFactor;
-    INT_t* rowPtr = (INT_t*)malloc((numVertices + 1) * sizeof(INT_t));
-    assert_malloc(rowPtr);
-    INT_t* colInd = (INT_t*)malloc(numEdges * sizeof(INT_t));
-    assert_malloc(colInd);
-    
-    graph->numVertices = numVertices;
-    graph->numEdges = numEdges;
-    graph->rowPtr = rowPtr;
-    graph->colInd = colInd;
+void allocate_graph(GRAPH_TYPE* graph) {
+    graph->rowPtr = (INT_t*)malloc((graph->numVertices + 1) * sizeof(INT_t));
+    assert_malloc(graph->rowPtr);
+    graph->colInd = (INT_t*)malloc(graph->numEdges * sizeof(INT_t));
+    assert_malloc(graph->colInd);
 }
 
-void create_graph_RMAT(GRAPH_TYPE* graph, int scale, int edgeFactor) {
+void free_graph(GRAPH_TYPE* graph) {
+    free(graph->rowPtr);
+    free(graph->colInd);
+    free(graph);
+}
 
-    allocate_graph_RMAT(scale, edgeFactor, graph);
-    
+void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
+    graph->numVertices = 1 << scale;
+    graph->numEdges = graph->numVertices * edgeFactor;
+
+    allocate_graph(graph);
+}
+
+void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
+
     INT_t numVertices = graph->numVertices;
     INT_t numEdges = graph->numEdges;
     INT_t* rowPtr = graph->rowPtr;
@@ -156,11 +160,6 @@ void print_graph(const GRAPH_TYPE* graph) {
     printf("\n");
 }
 
-void free_graph(GRAPH_TYPE* graph) {
-    free(graph->rowPtr);
-    free(graph->colInd);
-    free(graph);
-}
 
 int tc_chatGPT(GRAPH_TYPE *graph) {
   int num_triangles = 0;
@@ -231,8 +230,9 @@ main(int argc, char **argv) {
   
   originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   assert_malloc(originalGraph);
-
-  create_graph_RMAT(originalGraph, scale, EDGE_FACTOR);
+  allocate_graph_RMAT(scale, EDGE_FACTOR, originalGraph);
+    
+  create_graph_RMAT(originalGraph, scale);
 
   graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   assert_malloc(graph);
