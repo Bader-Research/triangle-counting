@@ -159,6 +159,7 @@ void print_graph(const GRAPH_TYPE* graph) {
 void free_graph(GRAPH_TYPE* graph) {
     free(graph->rowPtr);
     free(graph->colInd);
+    free(graph);
 }
 
 int tc_chatGPT(GRAPH_TYPE *graph) {
