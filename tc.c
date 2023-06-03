@@ -9,6 +9,7 @@
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
 #define LOOP_CNT       25
+#define DEBUG           1
 
 #ifdef GCC
 #define INLINE inline
@@ -83,68 +84,102 @@ void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
 }
 
 
+typedef struct {
+  INT_t src;
+  INT_t dst;
+} edge_t;
+
+int compareInt_t(const void *a, const void *b) {
+    INT_t arg1 = *(const INT_t *)a;
+    INT_t arg2 = *(const INT_t *)b;
+    if (arg1 < arg2) return -1;
+    if (arg1 > arg2) return 1;
+    return 0;
+}
+
 void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
-    INT_t numVertices = graph->numVertices;
-    INT_t numEdges = graph->numEdges;
-    INT_t* rowPtr = graph->rowPtr;
-    INT_t* colInd = graph->colInd;
+    int found;
 
-    INT_t* degree = (INT_t*)calloc(numVertices, sizeof(INT_t));
-    assert_malloc(degree);
+    edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
+    assert_malloc(edges);
 
-    srand(time(NULL));
+    for (INT_t e = 0; e < graph->numEdges; e++) {
 
-    rowPtr[0] = 0;
+      found = 1;
 
-    // Generate the edges
-    for (INT_t e = 0; e < numEdges; e++) {
-        INT_t src = 0, dest = 0;
+      while (found) {
+	INT_t src = 0, dest = 0;
 
-        for (INT_t level = 0; level < scale; level++) {
-            double randNum = (double)rand() / RAND_MAX;
+	for (INT_t level = 0; level < scale; level++) {
+	  double randNum = (double)rand() / RAND_MAX;
 
-            double a = 0.57, b = 0.19, c = 0.19, d = 1 - a - b - c;
+	  double a = 0.57, b = 0.19, c = 0.19; /* d = 1 - a - b - c */
 
-            if (randNum < a)
-                continue;
-            else if (randNum < a + b)
-                dest |= 1 << level;
-            else if (randNum < a + b + c)
-                src |= 1 << level;
-            else {
-                src |= 1 << level;
-                dest |= 1 << level;
-            }
-        }
+	  if (randNum < a)
+	    continue;
+	  else if (randNum < a + b)
+	    dest |= 1 << level;
+	  else if (randNum < a + b + c)
+	    src |= 1 << level;
+	  else {
+	    src |= 1 << level;
+	    dest |= 1 << level;
+	  }
+	}
+	  
+	edges[e].src = src;
+	edges[e].dst = dest;
+	
+	found = 0;
+	for (INT_t i = 0; i<e ; i++)
+	  if ((edges[i].src == src) && (edges[i].dst == dest)) found = 1;
+      }
 
-        colInd[e] = dest;
-        degree[src]++;
-        degree[dest]++;
+#if DEBUG
+      fprintf(stdout,"Edge[%5d]: (%5d, %5d)\n",e, edges[e].src, edges[e].dst);
+#endif
     }
 
-    // Compute the rowPtr array
-    for (INT_t i = 1; i <= numVertices; i++)
-        rowPtr[i] = rowPtr[i - 1] + degree[i - 1];
 
-    // Sort the column indices for each row
-    for (INT_t v = 0; v < numVertices; v++) {
-        INT_t rowStart = rowPtr[v];
-        INT_t rowEnd = rowPtr[v + 1];
-
-        for (INT_t i = rowStart + 1; i < rowEnd; i++) {
-            INT_t j = i;
-            while (j > rowStart && colInd[j] < colInd[j - 1]) {
-                INT_t temp = colInd[j];
-                colInd[j] = colInd[j - 1];
-                colInd[j - 1] = temp;
-                j--;
-            }
-        }
+    // Count the number of edges incident to each vertex
+    for (INT_t i = 0; i < graph->numEdges; i++) {
+        INT_t vertex = edges[i].src;
+        graph->rowPtr[vertex + 1]++;
     }
 
-    free(degree);
+    // Compute the prefix sum of the rowPtr array
+    for (INT_t i = 1; i <= graph->numVertices; i++) {
+      graph->rowPtr[i] += graph->rowPtr[i - 1];
+    }
+
+    // Populate the col_idx array with the destination vertices
+    INT_t *current_row = (INT_t *)calloc(graph->numVertices, sizeof(INT_t));
+    for (INT_t i = 0; i < graph->numEdges; i++) {
+        INT_t src_vertex = edges[i].src;
+        INT_t dst_vertex = edges[i].dst;
+        INT_t index = graph->rowPtr[src_vertex] + current_row[src_vertex];
+        graph->colInd[index] = dst_vertex;
+        current_row[src_vertex]++;
+    }
+
+    // Sort the column indices within each row
+    for (INT_t i = 0; i < graph->numVertices; i++) {
+      INT_t start = graph->rowPtr[i];
+      INT_t end = graph->rowPtr[i + 1];
+      INT_t size = end - start;
+      INT_t *row_indices = &graph->colInd[start];
+      qsort(row_indices, size, sizeof(INT_t), compareInt_t);
+    }
+
+    free(current_row);
+
+    free(edges);
+
 }
+
+    
+
 
 void print_graph(const GRAPH_TYPE* graph) {
     printf("Number of Vertices: %u\n", graph->numVertices);
@@ -233,6 +268,10 @@ main(int argc, char **argv) {
     
   create_graph_RMAT(originalGraph, scale);
 
+#if DEBUG
+  print_graph(originalGraph);
+#endif
+
   graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   assert_malloc(graph);
   allocate_graph_RMAT(scale, EDGE_FACTOR, graph);
@@ -275,5 +314,4 @@ main(int argc, char **argv) {
   free_graph(graph);
   return(0);
 }
-
 
