@@ -9,7 +9,7 @@
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
 #define LOOP_CNT       25
-#define DEBUG           0
+#define DEBUG           1
 
 #ifdef GCC
 #define INLINE inline
@@ -199,7 +199,7 @@ void print_graph(const GRAPH_TYPE* graph) {
 }
 
 
-int tc_chatGPT(GRAPH_TYPE *graph) {
+int tc_base(GRAPH_TYPE *graph) {
   int num_triangles = 0;
 
   INT_t* row_ptr = graph->rowPtr;
@@ -284,11 +284,11 @@ main(int argc, char **argv) {
   total_time = get_seconds();
   for (loop=0 ; loop<LOOP_CNT ; loop++) {
     copy_graph(originalGraph, graph);
-    numTriangles = tc_chatGPT(graph);
+    numTriangles = tc_base(graph);
   }
   total_time = get_seconds() - total_time;
   err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_chatGPT\n");
+  if (!err) fprintf(stderr,"ERROR with tc_base\n");
 
   over_time = get_seconds();
   for (loop=0 ; loop<LOOP_CNT ; loop++) {
@@ -299,7 +299,7 @@ main(int argc, char **argv) {
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_chatGPT: %f\n",
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_base: %f\n",
 	  scale,numTriangles,total_time);
 
 /******************************************************************/
