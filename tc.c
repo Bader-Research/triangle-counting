@@ -9,7 +9,7 @@
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
 #define LOOP_CNT       25
-#define DEBUG           1
+#define DEBUG           0
 
 #ifdef GCC
 #define INLINE inline
@@ -78,7 +78,7 @@ void free_graph(GRAPH_TYPE* graph) {
 
 void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
     graph->numVertices = 1 << scale;
-    graph->numEdges = graph->numVertices * edgeFactor;
+    graph->numEdges = 2 * graph->numVertices * edgeFactor; /* Factor of 2 is to store undirected edges (a, b) and (b, a) */
 
     allocate_graph(graph);
 }
@@ -104,7 +104,7 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
     edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
     assert_malloc(edges);
 
-    for (INT_t e = 0; e < graph->numEdges; e++) {
+    for (INT_t e = 0; e < graph->numEdges ; e+=2) {
 
       found = 1;
 
@@ -127,20 +127,23 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 	    dest |= 1 << level;
 	  }
 	}
-	  
+
 	edges[e].src = src;
 	edges[e].dst = dest;
+	edges[e+1].src = dest;
+	edges[e+1].dst = src;
 	
+	/* Only store unique edges */
 	found = 0;
 	for (INT_t i = 0; i<e ; i++)
 	  if ((edges[i].src == src) && (edges[i].dst == dest)) found = 1;
+	if (src == dest) found = 1; /* Do not add self-loops */
       }
 
 #if DEBUG
       fprintf(stdout,"Edge[%5d]: (%5d, %5d)\n",e, edges[e].src, edges[e].dst);
 #endif
     }
-
 
     // Count the number of edges incident to each vertex
     for (INT_t i = 0; i < graph->numEdges; i++) {
@@ -155,6 +158,7 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
     // Populate the col_idx array with the destination vertices
     INT_t *current_row = (INT_t *)calloc(graph->numVertices, sizeof(INT_t));
+    assert_malloc(current_row);
     for (INT_t i = 0; i < graph->numEdges; i++) {
         INT_t src_vertex = edges[i].src;
         INT_t dst_vertex = edges[i].dst;
@@ -202,32 +206,24 @@ int tc_chatGPT(GRAPH_TYPE *graph) {
   INT_t* col_ind = graph->colInd;
   INT_t num_vertices = graph->numVertices;
 
-  // Traverse each vertex
   for (INT_t i = 0; i < num_vertices; i++) {
-    // Get the neighbors of the current vertex
     INT_t start = row_ptr[i];
     INT_t end = row_ptr[i + 1];
 
-    // Check for triangles formed by pairs of neighbors
     for (INT_t j = start; j < end; j++) {
       INT_t neighbor1 = col_ind[j];
 
-      // Traverse the neighbors of the first neighbor
       for (INT_t k = start; k < end; k++) {
 	INT_t neighbor2 = col_ind[k];
 
-	// Check if there is an edge between neighbor1 and neighbor2
 	if (neighbor1 != neighbor2) {
-	  for (INT_t l = start; l < end; l++) {
-	    INT_t neighbor3 = col_ind[l];
-
-	    // Check if there is an edge between neighbor1 and neighbor3
-	    // and between neighbor2 and neighbor3
-	    if (neighbor2 != neighbor3 && neighbor1 != neighbor3) {
-	      if (neighbor3 == neighbor1) {
-		num_triangles++;
-		break;
-	      }
+	  INT_t start_n1 = row_ptr[neighbor1];
+	  INT_t end_n1 = row_ptr[neighbor1 + 1];
+	  
+	  for (INT_t l = start_n1; l < end_n1; l++) {
+	    if (col_ind[l] == neighbor2) {
+	      num_triangles++;
+	      break;
 	    }
 	  }
 	}
@@ -235,7 +231,7 @@ int tc_chatGPT(GRAPH_TYPE *graph) {
     }
   }
 
-  return num_triangles;
+  return (num_triangles/3);
 }
 
 int
@@ -258,8 +254,14 @@ main(int argc, char **argv) {
   else
     scale = atoi(argv[1]);
 
+  if (scale <= 5) {
+    fprintf(stderr, "Scale must be 6 or greater.\n");
+    exit(-1);
+  }
   
+#if DEBUG
   fprintf(stdout,"Scale [%2d]\n",scale);
+#endif
   
   
   originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
@@ -276,13 +278,6 @@ main(int argc, char **argv) {
   assert_malloc(graph);
   allocate_graph_RMAT(scale, EDGE_FACTOR, graph);
   
-  /* From ChatGPT 
-    // Example CSR graph representation
-    int num_vertices = 5;
-    int num_edges = 6;
-    int row_ptr[] = {0, 2, 5, 7, 9, 11};
-    int col_ind[] = {1, 2, 0, 2, 3, 0, 1, 3, 1, 4, 2, 4};
-  */
 
 /******************************************************************/
 
