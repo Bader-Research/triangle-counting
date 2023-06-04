@@ -9,7 +9,8 @@
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
 #define LOOP_CNT       25
-#define DEBUG           1
+#define SCALE_MIN       6
+#define DEBUG           0
 
 #ifdef GCC
 #define INLINE inline
@@ -64,9 +65,9 @@ void copy_graph(GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
 }
 
 void allocate_graph(GRAPH_TYPE* graph) {
-    graph->rowPtr = (INT_t*)malloc((graph->numVertices + 1) * sizeof(INT_t));
+  graph->rowPtr = (INT_t*)calloc((graph->numVertices + 1), sizeof(INT_t));
     assert_malloc(graph->rowPtr);
-    graph->colInd = (INT_t*)malloc(graph->numEdges * sizeof(INT_t));
+    graph->colInd = (INT_t*)calloc(graph->numEdges, sizeof(INT_t));
     assert_malloc(graph->colInd);
 }
 
@@ -99,17 +100,19 @@ int compareInt_t(const void *a, const void *b) {
 
 void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
-    int found;
+    register int good;
+    register int src, dst;
 
     edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
     assert_malloc(edges);
 
     for (INT_t e = 0; e < graph->numEdges ; e+=2) {
 
-      found = 1;
+      good = 0;
 
-      while (found) {
-	INT_t src = 0, dest = 0;
+      while (!good) {
+	src = 0;
+	dst = 0;
 
 	for (INT_t level = 0; level < scale; level++) {
 	  double randNum = (double)rand() / RAND_MAX;
@@ -119,27 +122,28 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 	  if (randNum < a)
 	    continue;
 	  else if (randNum < a + b)
-	    dest |= 1 << level;
+	    dst |= 1 << level;
 	  else if (randNum < a + b + c)
 	    src |= 1 << level;
 	  else {
 	    src |= 1 << level;
-	    dest |= 1 << level;
+	    dst |= 1 << level;
 	  }
 	}
 
-	edges[e].src = src;
-	edges[e].dst = dest;
-	edges[e+1].src = dest;
-	edges[e+1].dst = src;
-	
-	/* Only store unique edges */
-	found = 0;
+	good = 1;
+
+	/* Only keep unique edges */
 	for (INT_t i = 0; i<e ; i++)
-	  if ((edges[i].src == src) && (edges[i].dst == dest)) found = 1;
-	if (src == dest) found = 1; /* Do not add self-loops */
+	  if ((edges[i].src == src) && (edges[i].dst == dst)) good = 0;
+	/* Do not keep self-loops */
+	if (src == dst) good = 0;
       }
 
+      edges[e].src = src;
+      edges[e].dst = dst;
+      edges[e+1].src = dst;
+      edges[e+1].dst = src;
 #if DEBUG
       fprintf(stdout,"Edge[%5d]: (%5d, %5d)\n",e, edges[e].src, edges[e].dst);
 #endif
@@ -254,8 +258,8 @@ main(int argc, char **argv) {
   else
     scale = atoi(argv[1]);
 
-  if (scale <= 5) {
-    fprintf(stderr, "Scale must be 6 or greater.\n");
+  if (scale < SCALE_MIN) {
+    fprintf(stderr, "Scale must be %d or greater.\n",SCALE_MIN);
     exit(-1);
   }
   
