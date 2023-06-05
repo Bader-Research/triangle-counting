@@ -46,14 +46,11 @@ void assert_malloc(void *ptr) {
     }
 }
 
+static INT_t correctTriangleCount;
 /* Check the correctness of the triangle count.
    Return 1 if worked, 0 if failed */
 int check_triangleCount(GRAPH_TYPE *graph, INT_t numTriangles) {
-  int val = 1;
-
-  /* if bad, val = 0 */
-
-  return val;
+  return (numTriangles==correctTriangleCount);
 }
 
 
@@ -186,7 +183,6 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
 }
 
-    
 
 
 void print_graph(const GRAPH_TYPE* graph) {
@@ -234,6 +230,34 @@ int tc_base(GRAPH_TYPE *graph) {
       }
     }
   }
+
+  return (num_triangles/3);
+}
+
+int check_edge(GRAPH_TYPE *graph, INT_t src, INT_t dst) {
+  int exists = 0;
+
+  INT_t start = graph->rowPtr[src];
+  INT_t end = graph->rowPtr[src + 1];
+  for (INT_t i = start; i < end; i++)
+    if (graph->colInd[i] == dst) exists = 1;
+
+  return(exists);
+}
+
+int tc_bruteforce(GRAPH_TYPE *graph) {
+  register INT_t i, j, k;
+  int num_triangles = 0;
+
+
+  for (i = 0; i < graph->numVertices; i++)
+    for (j = 0; j < graph->numVertices; j++)
+      for (k = 0; k < graph->numVertices; k++) {
+
+	if (check_edge(graph, i, j) && check_edge(graph, j, k) && check_edge(graph, k, i))
+	  num_triangles++;
+
+      }
 
   return (num_triangles/3);
 }
@@ -303,7 +327,33 @@ main(int argc, char **argv) {
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_base: %f\n",
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_base: \t\t %f\n",
+	  scale,numTriangles,total_time);
+
+/******************************************************************/
+  correctTriangleCount = numTriangles;
+
+/******************************************************************/
+
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = tc_bruteforce(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with tc_bruteforce\n");
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_bruteforce: \t %f\n",
 	  scale,numTriangles,total_time);
 
 /******************************************************************/
