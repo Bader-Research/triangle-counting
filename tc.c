@@ -301,6 +301,41 @@ int tc_orientIntersect(GRAPH_TYPE *graph) {
   return num_triangles;
 }
 
+int tc_intersect(GRAPH_TYPE *graph) {
+  register INT_t v1, v2, i;
+  register INT_t start_v1, end_v1, start_v2, end_v2;
+  register INT_t ptr_v1, ptr_v2;
+  int num_triangles = 0;
+
+
+  for (v1 = 0; v1 < graph->numVertices; v1++) {
+    start_v1 = graph->rowPtr[v1];
+    end_v1 = graph->rowPtr[v1+1];
+    for (i = start_v1 ; i<end_v1 ; i++) {
+      v2 = graph->colInd[i];
+      /* Edge (v1, v2) */
+      start_v2 = graph->rowPtr[v2];
+      end_v2 = graph->rowPtr[v2+1];
+      ptr_v1 = start_v1;
+      ptr_v2 = start_v2;
+      while ((ptr_v1 < end_v1) && (ptr_v2 < end_v2)) {
+	if (graph->colInd[ptr_v1] == graph->colInd[ptr_v2]) {
+	  num_triangles++;
+	  ptr_v1++;
+	  ptr_v2++;
+	}
+	else
+	  if (graph->colInd[ptr_v1] < graph->colInd[ptr_v2])
+	    ptr_v1++;
+	  else
+	    ptr_v2++;
+      }
+    }
+  }
+
+  return (num_triangles/6);
+}
+
 int
 main(int argc, char **argv) {
   GRAPH_TYPE 
@@ -444,6 +479,31 @@ main(int argc, char **argv) {
   total_time /= (double)LOOP_CNT;
 
   fprintf(stdout," scale: %2d \t tc: %12d \t tc_orientIntersect: \t %f\n",
+	  scale,numTriangles,total_time);
+
+/******************************************************************/
+
+/******************************************************************/
+
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = tc_intersect(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with tc_intersect\n");
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_intersect: \t\t %f\n",
 	  scale,numTriangles,total_time);
 
 /******************************************************************/
