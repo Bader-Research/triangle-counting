@@ -231,7 +231,7 @@ int tc_base(GRAPH_TYPE *graph) {
     }
   }
 
-  return (num_triangles/3);
+  return (num_triangles/6);
 }
 
 int check_edge(GRAPH_TYPE *graph, INT_t src, INT_t dst) {
@@ -259,7 +259,24 @@ int tc_bruteforce(GRAPH_TYPE *graph) {
 
       }
 
-  return (num_triangles/3);
+  return (num_triangles/6);
+}
+
+int tc_oriented(GRAPH_TYPE *graph) {
+  register INT_t i, j, k;
+  int num_triangles = 0;
+
+
+  for (i = 0; i < graph->numVertices; i++)
+    for (j = i; j < graph->numVertices; j++)
+      for (k = j; k < graph->numVertices; k++) {
+
+	if (check_edge(graph, i, j) && check_edge(graph, j, k) && check_edge(graph, k, i))
+	  num_triangles++;
+
+      }
+
+  return num_triangles;
 }
 
 int
@@ -354,6 +371,31 @@ main(int argc, char **argv) {
   total_time /= (double)LOOP_CNT;
 
   fprintf(stdout," scale: %2d \t tc: %12d \t tc_bruteforce: \t %f\n",
+	  scale,numTriangles,total_time);
+
+/******************************************************************/
+
+  /******************************************************************/
+
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = tc_oriented(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with tc_oriented\n");
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(stdout," scale: %2d \t tc: %12d \t tc_oriented: \t\t %f\n",
 	  scale,numTriangles,total_time);
 
 /******************************************************************/
