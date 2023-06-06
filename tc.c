@@ -98,12 +98,25 @@ int compareInt_t(const void *a, const void *b) {
 void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
     register int good;
-    register int src, dst;
+    register INT_t src, dst;
+    INT_t connectedGraph;
 
     edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
     assert_malloc(edges);
 
-    for (INT_t e = 0; e < graph->numEdges ; e+=2) {
+#if 1
+    connectedGraph = 0;
+#else
+    connectedGraph = graph->numVertices-1;
+#endif
+    
+
+    for (INT_t e = 0; e < connectedGraph ; e++) {
+      edges[e].src = e;
+      edges[e].dst = e+1;
+    }
+
+    for (INT_t e = connectedGraph ; e < graph->numEdges ; e+=2) {
 
       good = 0;
 
@@ -199,6 +212,7 @@ void print_graph(const GRAPH_TYPE* graph) {
 }
 
 
+
 int tc_base(GRAPH_TYPE *graph) {
   int num_triangles = 0;
 
@@ -234,6 +248,8 @@ int tc_base(GRAPH_TYPE *graph) {
   return (num_triangles/6);
 }
 
+
+  
 int check_edge(GRAPH_TYPE *graph, INT_t src, INT_t dst) {
   int exists = 0;
 
@@ -336,20 +352,47 @@ int tc_intersect(GRAPH_TYPE *graph) {
   return (num_triangles/6);
 }
 
+
+void runTC(int (*f)(GRAPH_TYPE*), INT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
+  int loop, err;
+  double 
+    total_time,
+    over_time;
+  INT_t numTriangles;
+  
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = (*f)(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with %s\n",name);
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(stdout," scale: %2d \t tc: %12d \t %s: \t",
+	  scale,numTriangles,name);
+  if (strlen(name) <= 12) fprintf(stdout,"\t");
+  fprintf(stdout, " %f\n",total_time);
+
+}
+
+
 int
 main(int argc, char **argv) {
   GRAPH_TYPE 
     *originalGraph,
     *graph;
   INT_t numTriangles;
-  int 
-    scale,
-    loop;
-  double 
-    total_time,
-    over_time;
-
-  int err;
+  int scale;
 
   if (argc <= 1)
     scale = DEFAULT_SCALE;
@@ -380,134 +423,15 @@ main(int argc, char **argv) {
   assert_malloc(graph);
   allocate_graph_RMAT(scale, EDGE_FACTOR, graph);
   
-
-/******************************************************************/
-
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_base(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_base\n");
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_base: \t\t %f\n",
-	  scale,numTriangles,total_time);
-
-/******************************************************************/
+  copy_graph(originalGraph, graph);
+  numTriangles = tc_base(graph);
   correctTriangleCount = numTriangles;
 
-/******************************************************************/
-
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_bruteforce(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_bruteforce\n");
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_bruteforce: \t %f\n",
-	  scale,numTriangles,total_time);
-
-/******************************************************************/
-
-/******************************************************************/
-
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_oriented(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_oriented\n");
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_oriented: \t\t %f\n",
-	  scale,numTriangles,total_time);
-
-/******************************************************************/
-
-
-/******************************************************************/
-
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_orientIntersect(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_orientIntersect\n");
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_orientIntersect: \t %f\n",
-	  scale,numTriangles,total_time);
-
-/******************************************************************/
-
-/******************************************************************/
-
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_intersect(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with tc_intersect\n");
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(stdout," scale: %2d \t tc: %12d \t tc_intersect: \t\t %f\n",
-	  scale,numTriangles,total_time);
-
-/******************************************************************/
-
+  runTC(tc_base, scale, originalGraph, graph, "tc_base");
+  runTC(tc_oriented, scale, originalGraph, graph, "tc_oriented");
+  runTC(tc_orientIntersect, scale, originalGraph, graph, "tc_orientIntersect");
+  runTC(tc_intersect, scale, originalGraph, graph, "tc_intersect");
+  runTC(tc_bruteforce, scale, originalGraph, graph, "tc_bruteforce");
   
   free_graph(originalGraph);
   free_graph(graph);
