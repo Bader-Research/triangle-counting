@@ -8,7 +8,7 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
-#define LOOP_CNT       25
+#define LOOP_CNT       10
 #define SCALE_MIN       6
 #define DEBUG           0
 
@@ -99,24 +99,22 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 
     register int good;
     register INT_t src, dst;
-    INT_t connectedGraph;
 
     edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
     assert_malloc(edges);
 
+    INT_t e_start = 0;
 #if 1
-    connectedGraph = 0;
-#else
-    connectedGraph = graph->numVertices-1;
+    for (INT_t i = 0; i < graph->numVertices - 1 ; i++) {
+      edges[(2*i)  ].src = i;
+      edges[(2*i)  ].dst = i+1;
+      edges[(2*i)+1].src = i+1;
+      edges[(2*i)+1].dst = i;
+    }
+    e_start = 2*(graph->numVertices - 1);
 #endif
     
-
-    for (INT_t e = 0; e < connectedGraph ; e++) {
-      edges[e].src = e;
-      edges[e].dst = e+1;
-    }
-
-    for (INT_t e = connectedGraph ; e < graph->numEdges ; e+=2) {
+    for (INT_t e = e_start ; e < graph->numEdges ; e+=2) {
 
       good = 0;
 
@@ -150,8 +148,8 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
 	if (src == dst) good = 0;
       }
 
-      edges[e].src = src;
-      edges[e].dst = dst;
+      edges[e  ].src = src;
+      edges[e  ].dst = dst;
       edges[e+1].src = dst;
       edges[e+1].dst = src;
 #if DEBUG
