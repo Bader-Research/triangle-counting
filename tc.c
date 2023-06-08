@@ -1,3 +1,5 @@
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +14,9 @@
 #define SCALE_MIN       6
 #define DEBUG           0
 
+#define TRUE  1
+#define FALSE 0
+
 #ifdef GCC
 #define INLINE inline
 /* #define INLINE */
@@ -20,6 +25,7 @@
 #endif
 
 #define INT_t uint32_t
+#define SINT_t int32_t
 
 typedef struct {
     INT_t numVertices;
@@ -104,7 +110,7 @@ void create_graph_RMAT(GRAPH_TYPE* graph, int scale) {
     assert_malloc(edges);
 
     INT_t e_start = 0;
-#if 1
+#if 0
     for (INT_t i = 0; i < graph->numVertices - 1 ; i++) {
       edges[(2*i)  ].src = i;
       edges[(2*i)  ].dst = i+1;
@@ -315,40 +321,102 @@ int tc_orientIntersect(GRAPH_TYPE *graph) {
   return num_triangles;
 }
 
-int tc_intersect(GRAPH_TYPE *graph) {
-  register INT_t v1, v2, i;
-  register INT_t start_v1, end_v1, start_v2, end_v2;
-  register INT_t ptr_v1, ptr_v2;
+
+INT_t intersectSizeLinear(GRAPH_TYPE* graph, INT_t v, INT_t w) {
+  register INT_t vb, ve, wb, we;
+  register INT_t ptr_v, ptr_w;
+  INT_t num_triangles = 0;
+  
+  vb = graph->rowPtr[v ];
+  ve = graph->rowPtr[v+1];
+  wb = graph->rowPtr[w  ];
+  we = graph->rowPtr[w+1];
+
+  ptr_v = vb;
+  ptr_w = wb;
+  while ((ptr_v < ve) && (ptr_w < we)) {
+    if (graph->colInd[ptr_v] == graph->colInd[ptr_w]) {
+      num_triangles++;
+      ptr_v++;
+      ptr_w++;
+    }
+    else
+      if (graph->colInd[ptr_v] < graph->colInd[ptr_w])
+	ptr_v++;
+      else
+	ptr_w++;
+  }
+  return num_triangles;
+}
+
+int tc_intersectLinear(GRAPH_TYPE *graph) {
+  register INT_t v, w;
+  register INT_t b, e;
   int num_triangles = 0;
 
-
-  for (v1 = 0; v1 < graph->numVertices; v1++) {
-    start_v1 = graph->rowPtr[v1];
-    end_v1 = graph->rowPtr[v1+1];
-    for (i = start_v1 ; i<end_v1 ; i++) {
-      v2 = graph->colInd[i];
-      /* Edge (v1, v2) */
-      start_v2 = graph->rowPtr[v2];
-      end_v2 = graph->rowPtr[v2+1];
-      ptr_v1 = start_v1;
-      ptr_v2 = start_v2;
-      while ((ptr_v1 < end_v1) && (ptr_v2 < end_v2)) {
-	if (graph->colInd[ptr_v1] == graph->colInd[ptr_v2]) {
-	  num_triangles++;
-	  ptr_v1++;
-	  ptr_v2++;
-	}
-	else
-	  if (graph->colInd[ptr_v1] < graph->colInd[ptr_v2])
-	    ptr_v1++;
-	  else
-	    ptr_v2++;
-      }
+  for (v = 0; v < graph->numVertices; v++) {
+    b = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    for (INT_t i=b ; i<e ; i++) {
+      w = graph->colInd[i];
+      num_triangles += intersectSizeLinear(graph, v, w);
     }
   }
 
   return (num_triangles/6);
 }
+
+int binarySearch(INT_t* list, INT_t start, INT_t end, INT_t target) {
+  SINT_t s=start, e=end, mid;
+  while (s <= e) {
+    mid = s + (e - s) / 2;
+    if (list[mid] == target)
+      return /* mid */ TRUE;
+
+    if (list[mid] < target)
+      s = mid + 1;
+    else
+      e = mid - 1;
+  }
+  return FALSE;
+}
+
+INT_t intersectSizeLog(GRAPH_TYPE* graph, INT_t v, INT_t w) {
+  register INT_t vb, ve, wb, we;
+  INT_t count=0;
+  if ((v<0) || (v >= graph->numVertices) || (w<0) || (w >= graph->numVertices)) {
+    fprintf(stderr,"vertices out of range in intersectSize()\n");
+    exit(-1);
+  }
+  vb = graph->rowPtr[v  ];
+  ve = graph->rowPtr[v+1];
+  wb = graph->rowPtr[w  ];
+  we = graph->rowPtr[w+1];
+
+  for (INT_t i=vb ; i<ve ; i++)
+    count += binarySearch(graph->colInd, wb, we, graph->colInd[i]);
+
+  return count;
+}
+
+int tc_intersectLog(GRAPH_TYPE *graph) {
+  register INT_t v, w;
+  register INT_t b, e;
+  int num_triangles = 0;
+
+  for (v = 0; v < graph->numVertices; v++) {
+    b = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    for (INT_t i=b ; i<e ; i++) {
+      w  = graph->colInd[i];
+      num_triangles += intersectSizeLog(graph, v, w);
+    }
+  }
+
+  return (num_triangles/6);
+}
+
+
 
 
 void runTC(int (*f)(GRAPH_TYPE*), INT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
@@ -428,7 +496,8 @@ main(int argc, char **argv) {
   runTC(tc_base, scale, originalGraph, graph, "tc_base");
   runTC(tc_oriented, scale, originalGraph, graph, "tc_oriented");
   runTC(tc_orientIntersect, scale, originalGraph, graph, "tc_orientIntersect");
-  runTC(tc_intersect, scale, originalGraph, graph, "tc_intersect");
+  runTC(tc_intersectLinear, scale, originalGraph, graph, "tc_intersectLinear");
+  runTC(tc_intersectLog, scale, originalGraph, graph, "tc_intersectLog");
   runTC(tc_bruteforce, scale, originalGraph, graph, "tc_bruteforce");
   
   free_graph(originalGraph);
