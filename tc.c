@@ -368,7 +368,7 @@ int tc_intersectLinear(GRAPH_TYPE *graph) {
 
 int binarySearch(INT_t* list, INT_t start, INT_t end, INT_t target) {
   SINT_t s=start, e=end, mid;
-  while (s <= e) {
+  while (s < e) {
     mid = s + (e - s) / 2;
     if (list[mid] == target)
       return /* mid */ TRUE;
@@ -376,7 +376,7 @@ int binarySearch(INT_t* list, INT_t start, INT_t end, INT_t target) {
     if (list[mid] < target)
       s = mid + 1;
     else
-      e = mid - 1;
+      e = mid;
   }
   return FALSE;
 }
