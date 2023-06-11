@@ -560,6 +560,177 @@ UINT_t tc_intersectPartition(GRAPH_TYPE *graph) {
 }
 
 
+static UINT_t EMPTY;
+
+// Queue structure for BFS traversal
+typedef struct {
+  UINT_t *items;
+  UINT_t front;
+  UINT_t rear;
+  UINT_t size;
+} Queue;
+
+// Function to create a new queue
+Queue *createQueue(UINT_t size) {
+  Queue *queue = (Queue *)malloc(sizeof(Queue));
+  assert_malloc(queue);
+  queue->items = (UINT_t *)malloc(size * sizeof(UINT_t));
+  assert_malloc(queue->items);
+  queue->front = EMPTY;
+  queue->rear = EMPTY;
+  queue->size = size;
+  return queue;
+}
+
+void free_queue(Queue *queue) {
+  free(queue->items);
+  free(queue);
+}
+
+// Function to check if the queue is empty
+int isEmpty(Queue *queue) {
+  return queue->rear == EMPTY;
+}
+
+// Function to check if the queue is full
+int isFull(Queue *queue) {
+  return queue->rear == queue->size - 1;
+}
+
+// Function to add an element to the queue
+void enqueue(Queue *queue, UINT_t value) {
+  if (isFull(queue))
+    fprintf(stderr,"Queue is full.\n");
+  else {
+    if (queue->front == EMPTY) {
+      queue->front = 0;
+      queue->rear  = 0;
+      queue->items[queue->rear] = value;
+    } else {
+      queue->rear++;
+      queue->items[queue->rear] = value;
+    }
+  }
+}
+
+// Function to remove an element from the queue
+UINT_t dequeue(Queue *queue) {
+  UINT_t item;
+  if (isEmpty(queue)) {
+    printf("Queue is empty.\n");
+    item = EMPTY;
+  } else {
+    item = queue->items[queue->front];
+    queue->front++;
+    if (queue->front > queue->rear)
+      queue->front = queue->rear = EMPTY;
+  }
+  return item;
+}
+
+// Function to perform breadth-first search
+void bfs(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
+  UINT_t *visited = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
+  assert_malloc(visited);
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = 1;
+  enqueue(queue, startVertex);
+  level[startVertex] = 0;
+  
+  while (!isEmpty(queue)) {
+    UINT_t currentVertex = dequeue(queue);
+    for (UINT_t i = graph->rowPtr[currentVertex]; i < graph->rowPtr[currentVertex + 1]; i++) {
+      UINT_t adjacentVertex = graph->colInd[i];
+      if (!visited[adjacentVertex])  {
+	visited[adjacentVertex] = 1;
+	enqueue(queue, adjacentVertex);
+	level[adjacentVertex] = level[currentVertex] + 1;
+      }
+    }
+  }
+
+  free(visited);
+  free_queue(queue);
+}
+
+
+
+void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
+  register UINT_t vb, ve, wb, we;
+  register UINT_t ptr_v, ptr_w;
+  UINT_t level_v;
+  
+  level_v = level[v];
+
+  vb = graph->rowPtr[v ];
+  ve = graph->rowPtr[v+1];
+  wb = graph->rowPtr[w  ];
+  we = graph->rowPtr[w+1];
+
+
+  ptr_v = vb;
+  ptr_w = wb;
+  while ((ptr_v < ve) && (ptr_w < we)) {
+    if (graph->colInd[ptr_v] == graph->colInd[ptr_w]) {
+      if (level_v == level[graph->colInd[ptr_v]]) (*c2)++;
+      else (*c1)++;
+      ptr_v++;
+      ptr_w++;
+    }
+    else
+      if (graph->colInd[ptr_v] < graph->colInd[ptr_w])
+	ptr_v++;
+      else
+	ptr_w++;
+  }
+
+  return;
+}
+
+
+UINT_t tc_bader(GRAPH_TYPE *graph) {
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t s, e, l, w;
+  UINT_t c1, c2;
+  UINT_t NO_LEVEL;
+
+  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(level);
+  NO_LEVEL = graph->numVertices;
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+    level[i] = NO_LEVEL;
+  
+  EMPTY = graph->numVertices;
+  bfs(graph, 0, level);
+
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+    if (level[i] == NO_LEVEL) {
+      bfs(graph, i, level);
+    }
+  }
+
+  c1 = 0; c2 = 0;
+  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
+    s = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      w = graph->colInd[j];
+      if ((v < w) && (level[w] == l))
+	bader_intersectSizeLinear(graph, level, v, w, &c1, &c2);
+    }
+  }
+
+
+  free(level);
+
+  return c1 + (c2/3);
+}
+
+
+
  
 void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
   int loop, err;
@@ -589,7 +760,7 @@ void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GR
   fprintf(stdout," scale: %2d \t tc: %12d \t %s: \t",
 	  scale,numTriangles,name);
   if (strlen(name) <= 12) fprintf(stdout,"\t");
-  fprintf(stdout, " %f\n",total_time);
+  fprintf(stdout, " %9.6f\n",total_time);
 
 }
 
@@ -643,6 +814,7 @@ main(int argc, char **argv) {
   /*  runTC(tc_intersectPartition, scale, originalGraph, graph, "tc_intersectPartition"); */
   runTC(tc_triples, scale, originalGraph, graph, "tc_triples");
   runTC(tc_triples_DO, scale, originalGraph, graph, "tc_triples_DO");
+  runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
   
   free_graph(originalGraph);
   free_graph(graph);
