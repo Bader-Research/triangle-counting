@@ -210,7 +210,51 @@ void print_graph(const GRAPH_TYPE* graph) {
     printf("\n");
 }
 
-
+/* Algorithm from
+   T. A. Davis, "Graph algorithms via SuiteSparse: GraphBLAS: triangle counting and K-truss," 2018 IEEE High Performance extreme Computing Conference (HPEC), Waltham, MA, USA, 2018, pp. 1-6, doi: 10.1109/HPEC.2018.8547538.
+*/
+UINT_t tc_davis // # of triangles
+(
+#if 1
+GRAPH_TYPE *graph
+#else
+const UINT_t *restrict Ap, // column pointers, size n+1
+const UINT_t *restrict Ai, // row indices
+const UINT_t n // A is n-by-n
+#endif
+ )
+{
+#if 1
+  UINT_t *Ap = graph->rowPtr;
+  UINT_t *Ai = graph->colInd;
+  UINT_t n = graph->numVertices;
+#endif
+#if 1
+  char *restrict Mark = (char *) calloc (n, sizeof (char)) ;
+#else
+  bool *restrict Mark = (bool *) calloc (n, sizeof (bool)) ;
+#endif
+  if (Mark == NULL) return (-1) ;
+  UINT_t ntri = 0 ;
+  for (UINT_t j = 0 ; j < n ; j++) {
+    // scatter A(:,j) into Mark
+    for (UINT_t p = Ap [j] ; p < Ap [j+1] ; p++)
+      Mark [Ai [p]] = 1 ;
+    // sum(C(:,j)) where C(:,j) = (A * A(:,j)) .* Mark
+    for (UINT_t p = Ap [j] ; p < Ap [j+1] ; p++) {
+      const UINT_t k = Ai [p] ;
+      // C(:,j) += (A(:,k) * A(k,j)) .* Mark
+      for (UINT_t pa = Ap [k] ; pa < Ap [k+1] ; pa++)
+	// C(i,j) += (A(i,k) * A(k,j)) .* Mark
+	ntri += Mark [Ai [pa]] ;
+    }
+    for (UINT_t p = Ap [j] ; p < Ap [j+1] ; p++)
+      Mark [Ai [p]] = 0 ;
+  }
+  free (Mark) ;
+  return (ntri/6) ;
+}
+ 
 
 UINT_t tc_wedge(GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
@@ -974,6 +1018,7 @@ main(int argc, char **argv) {
   runTC(tc_intersectLog, scale, originalGraph, graph, "tc_intersectLog");
   runTC(tc_intersectLog_DO, scale, originalGraph, graph, "tc_intersectLog_DO");
   /*  runTC(tc_intersectPartition, scale, originalGraph, graph, "tc_intersectPartition"); */
+  runTC(tc_davis, scale, originalGraph, graph, "tc_davis");
   runTC(tc_low, scale, originalGraph, graph, "tc_low");
   runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
   runTC(tc_bader2, scale, originalGraph, graph, "tc_bader2");
