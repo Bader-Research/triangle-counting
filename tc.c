@@ -560,6 +560,79 @@ UINT_t tc_intersectPartition(GRAPH_TYPE *graph) {
 }
 
 
+/* T. M. Low, V. N. Rao, M. Lee, D. Popovici, F. Franchetti and S. McMillan,
+   "First look: Linear algebra-based triangle counting without matrix multiplication,"
+   2017 IEEE High Performance Extreme Computing Conference (HPEC),
+   Waltham, MA, USA, 2017, pp. 1-6,
+   doi: 10.1109/HPEC.2017.8091046. */
+UINT_t tc_low(
+#if 1
+			GRAPH_TYPE *graph
+#else
+			UINT_t *IA , // row indices
+			UINT_t *JA  // column indices
+#endif
+			)
+{
+#if 1
+  UINT_t* IA = graph->rowPtr;
+  UINT_t* JA = graph->colInd;
+  UINT_t N = graph->numVertices;
+#endif
+  UINT_t delta = 0 ; // number of triangles
+
+  // for every vertex in V_{BR}
+# pragma omp parallel for schedule (dynamic) reduction (+ : delta)
+  for ( UINT_t i = 1 ; i<N-1; i ++ )
+    {
+      UINT_t *curr_row_x = IA + i ;
+      UINT_t *curr_row_A = IA + i + 1;
+      UINT_t num_nnz_curr_row_x = *curr_row_A - *curr_row_x;
+      UINT_t *x_col_begin = ( JA + *curr_row_x);
+      UINT_t *x_col_end = x_col_begin;
+      UINT_t *row_bound = x_col_begin + num_nnz_curr_row_x;
+      UINT_t col_x_min = 0;
+      UINT_t col_x_max = i - 1;
+
+      // partition the current row into x and y, where x == a01 ^ T == a10t and y == a12t
+      while (x_col_end < row_bound && *x_col_end < col_x_max)
+	++x_col_end;
+      x_col_end -= (*x_col_end > col_x_max || x_col_end == row_bound);
+
+      UINT_t *y_col_begin = x_col_end + 1;
+      UINT_t *y_col_end = row_bound - 1;
+      UINT_t num_nnz_y = (y_col_end - y_col_begin) + 1;
+      UINT_t num_nnz_x = (x_col_end - x_col_begin) + 1;
+
+      UINT_t y_col_first = i + 1;
+      UINT_t x_col_first = 0;
+      UINT_t *y_col = y_col_begin;
+
+      // compute y*A20*x ( Equation 5 )
+      for (UINT_t j = 0 ; j< num_nnz_y ; ++j ,++ y_col)
+	{
+	  UINT_t row_index_A = *y_col - y_col_first;
+	  UINT_t *x_col = x_col_begin;
+	  UINT_t num_nnz_A = *( curr_row_A + row_index_A + 1 ) - *( curr_row_A + row_index_A );
+	  UINT_t *A_col = ( JA + *( curr_row_A + row_index_A ) );
+	  UINT_t *A_col_max = A_col + num_nnz_A ;
+
+	  for (UINT_t k = 0 ; k < num_nnz_x && *A_col <= col_x_max ; ++k )
+	    {
+	      UINT_t row_index_x = *x_col - x_col_first;
+	      while ( (* A_col < *x_col ) && ( A_col < A_col_max ) )
+		++A_col;
+	      delta += (* A_col == row_index_x ) ;
+	      
+	      ++x_col ;
+	    }
+	}
+    }
+  return delta ;
+ }
+
+
+
 static UINT_t EMPTY;
 
 // Queue structure for BFS traversal
@@ -768,6 +841,10 @@ UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UI
   return count;
 }
 
+#if 1
+UINT_t k;
+#endif
+
 UINT_t tc_bader2(GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
@@ -775,6 +852,9 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
   UINT_t s, e, l, w;
   UINT_t num_triangles = 0;
   UINT_t NO_LEVEL;
+#if 1
+  k=0;
+#endif
 
   level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
   assert_malloc(level);
@@ -797,8 +877,12 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
     l = level[v];
     for (UINT_t j = s ; j<e ; j++) {
       w = graph->colInd[j];
-      if ((v < w) && (level[w] == l))
+      if ((v < w) && (level[w] == l)) {
+#if 1
+	k++;
+#endif
 	num_triangles += bader2_intersectSizeLinear(graph, level, v, w);
+      }
     }
   }
 
@@ -890,8 +974,12 @@ main(int argc, char **argv) {
   runTC(tc_intersectLog, scale, originalGraph, graph, "tc_intersectLog");
   runTC(tc_intersectLog_DO, scale, originalGraph, graph, "tc_intersectLog_DO");
   /*  runTC(tc_intersectPartition, scale, originalGraph, graph, "tc_intersectPartition"); */
+  runTC(tc_low, scale, originalGraph, graph, "tc_low");
   runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
   runTC(tc_bader2, scale, originalGraph, graph, "tc_bader2");
+#if 1
+  printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
+#endif
   runTC(tc_triples, scale, originalGraph, graph, "tc_triples");
   runTC(tc_triples_DO, scale, originalGraph, graph, "tc_triples_DO");
   
