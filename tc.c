@@ -730,6 +730,84 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
 }
 
 
+UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w) {
+  register UINT_t vb, ve, wb, we;
+  register UINT_t ptr_v, ptr_w;
+  UINT_t vlist, wlist, level_v;
+  UINT_t count = 0;
+  
+  level_v = level[v];
+
+  vb = graph->rowPtr[v ];
+  ve = graph->rowPtr[v+1];
+  wb = graph->rowPtr[w  ];
+  we = graph->rowPtr[w+1];
+
+
+  ptr_v = vb;
+  ptr_w = wb;
+  while ((ptr_v < ve) && (ptr_w < we)) {
+    vlist = graph->colInd[ptr_v];
+    wlist = graph->colInd[ptr_w];
+    if (vlist == wlist) {
+      if (level_v != level[vlist])
+	count++;
+      else
+	if ( (vlist < v) && (vlist < w) ) /* (level_v == level[vlist]) */ 
+	  count++;
+      ptr_v++;
+      ptr_w++;
+    }
+    else
+      if (vlist < wlist)
+	ptr_v++;
+      else
+	ptr_w++;
+  }
+
+  return count;
+}
+
+UINT_t tc_bader2(GRAPH_TYPE *graph) {
+  /* Instead of c1, c2, use a single counter for triangles */
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t s, e, l, w;
+  UINT_t num_triangles = 0;
+  UINT_t NO_LEVEL;
+
+  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(level);
+  NO_LEVEL = graph->numVertices;
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+    level[i] = NO_LEVEL;
+  
+  EMPTY = graph->numVertices;
+  bfs(graph, 0, level);
+
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+    if (level[i] == NO_LEVEL) {
+      bfs(graph, i, level);
+    }
+  }
+
+  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
+    s = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      w = graph->colInd[j];
+      if ((v < w) && (level[w] == l))
+	num_triangles += bader2_intersectSizeLinear(graph, level, v, w);
+    }
+  }
+
+  free(level);
+
+  return num_triangles;
+}
+
+
 
  
 void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
@@ -812,9 +890,10 @@ main(int argc, char **argv) {
   runTC(tc_intersectLog, scale, originalGraph, graph, "tc_intersectLog");
   runTC(tc_intersectLog_DO, scale, originalGraph, graph, "tc_intersectLog_DO");
   /*  runTC(tc_intersectPartition, scale, originalGraph, graph, "tc_intersectPartition"); */
+  runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
+  runTC(tc_bader2, scale, originalGraph, graph, "tc_bader2");
   runTC(tc_triples, scale, originalGraph, graph, "tc_triples");
   runTC(tc_triples_DO, scale, originalGraph, graph, "tc_triples_DO");
-  runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
   
   free_graph(originalGraph);
   free_graph(graph);
