@@ -769,10 +769,9 @@ void bfs(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
   free_queue(queue);
 }
 
-void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
-  UINT_t *visited = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
-  assert_malloc(visited);
-  Queue *queue = createQueue(graph->numVertices);
+void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level, Queue* queue, UINT_t* visited) {
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
 
   visited[startVertex] = 1;
   enqueue(queue, startVertex);
@@ -780,8 +779,8 @@ void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
   
   while (!isEmpty(queue)) {
     UINT_t currentVertex = dequeue(queue);
-    for (UINT_t i = graph->rowPtr[currentVertex]; i < graph->rowPtr[currentVertex + 1]; i++) {
-      UINT_t adjacentVertex = graph->colInd[i];
+    for (UINT_t i = Ap[currentVertex]; i < Ap[currentVertex + 1]; i++) {
+      UINT_t adjacentVertex = Ai[i];
       if (!visited[adjacentVertex])  {
 	visited[adjacentVertex] = 1;
 	enqueue(queue, adjacentVertex);
@@ -789,9 +788,6 @@ void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
       }
     }
   }
-
-  free(visited);
-  free_queue(queue);
 }
 
 
@@ -878,6 +874,7 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
   UINT_t c1, c2;
   register UINT_t x;
   char *Mark;
+  UINT_t *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -885,15 +882,20 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
   level = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(level);
   
+  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(visited);
+
   EMPTY = n;
 
   Mark = (char *)calloc(n, sizeof(char));
   assert_malloc(Mark);
 
+  Queue *queue = createQueue(n);
+
   c1 = 0; c2 = 0;
   for (UINT_t v = 0 ; v < n ; v++) {
     if (!level[v])
-      bfs_bader3(graph, v, level);
+      bfs_bader3(graph, v, level, queue, visited);
     const UINT_t s = Ap[v  ];
     const UINT_t e = Ap[v+1];
     const UINT_t l = level[v];
@@ -921,7 +923,10 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
       Mark[Ai[p]] = 0;
   }
 
+  free_queue(queue);
+
   free(Mark);
+  free(visited);
   free(level);
 
   return c1 + (c2/3);
