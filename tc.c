@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <limits.h>
 #include <strings.h>
+#include <stdbool.h>
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
@@ -229,13 +230,9 @@ const UINT_t n // A is n-by-n
   UINT_t *Ai = graph->colInd;
   UINT_t n = graph->numVertices;
 #endif
-#if 1
-  char *restrict Mark = (char *) calloc (n, sizeof (char)) ;
-  assert_malloc(Mark);
-#else
   bool *restrict Mark = (bool *) calloc (n, sizeof (bool)) ;
   if (Mark == NULL) return (-1) ;
-#endif
+  
   UINT_t ntri = 0 ;
   for (UINT_t j = 0 ; j < n ; j++) {
     // scatter A(:,j) into Mark
@@ -772,6 +769,31 @@ void bfs(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
   free_queue(queue);
 }
 
+void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level) {
+  UINT_t *visited = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
+  assert_malloc(visited);
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = 1;
+  enqueue(queue, startVertex);
+  level[startVertex] = 1;
+  
+  while (!isEmpty(queue)) {
+    UINT_t currentVertex = dequeue(queue);
+    for (UINT_t i = graph->rowPtr[currentVertex]; i < graph->rowPtr[currentVertex + 1]; i++) {
+      UINT_t adjacentVertex = graph->colInd[i];
+      if (!visited[adjacentVertex])  {
+	visited[adjacentVertex] = 1;
+	enqueue(queue, adjacentVertex);
+	level[adjacentVertex] = level[currentVertex] + 1;
+      }
+    }
+  }
+
+  free(visited);
+  free_queue(queue);
+}
+
 
 
 void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
@@ -850,46 +872,37 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
 UINT_t tc_bader3(GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Direction orientied. */
   UINT_t* level;
-  UINT_t s, e, l, w;
   UINT_t c1, c2;
-  UINT_t NO_LEVEL;
   register UINT_t x;
   char *Mark;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
 
-  level = (UINT_t *)malloc(n * sizeof(UINT_t));
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(level);
-  NO_LEVEL = n;
-  for (UINT_t i = 0 ; i < n ; i++) 
-    level[i] = NO_LEVEL;
   
   EMPTY = n;
-  /*bfs(graph, 0, level);*/
-
-  for (UINT_t i = 0 ; i < n ; i++) {
-    if (level[i] == NO_LEVEL) {
-      bfs(graph, i, level);
-    }
-  }
 
   Mark = (char *)calloc(n, sizeof(char));
   assert_malloc(Mark);
 
   c1 = 0; c2 = 0;
   for (UINT_t v = 0 ; v < n ; v++) {
-    s = Ap[v  ];
-    e = Ap[v+1];
-    l = level[v];
+    if (!level[v])
+      bfs_bader3(graph, v, level);
+    const UINT_t s = Ap[v  ];
+    const UINT_t e = Ap[v+1];
+    const UINT_t l = level[v];
 
     for (UINT_t p = s ; p<e ; p++)
       Mark[Ai[p]] = 1;
     
     for (UINT_t j = s ; j<e ; j++) {
-      w = Ai[j];
+      const UINT_t w = Ai[j];
       if ((v < w) && (level[w] == l)) {
 	/* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
 	for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
