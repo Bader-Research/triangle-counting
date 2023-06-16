@@ -821,7 +821,6 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
     level[i] = NO_LEVEL;
   
   EMPTY = graph->numVertices;
-  bfs(graph, 0, level);
 
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
@@ -849,6 +848,8 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
 
 
 UINT_t tc_bader3(GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
   /* Direction orientied. */
   UINT_t* level;
   UINT_t s, e, l, w;
@@ -856,40 +857,43 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
   UINT_t NO_LEVEL;
   register UINT_t x;
   char *Mark;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
 
-  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  level = (UINT_t *)malloc(n * sizeof(UINT_t));
   assert_malloc(level);
-  NO_LEVEL = graph->numVertices;
-  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+  NO_LEVEL = n;
+  for (UINT_t i = 0 ; i < n ; i++) 
     level[i] = NO_LEVEL;
   
-  EMPTY = graph->numVertices;
-  bfs(graph, 0, level);
+  EMPTY = n;
+  /*bfs(graph, 0, level);*/
 
-  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+  for (UINT_t i = 0 ; i < n ; i++) {
     if (level[i] == NO_LEVEL) {
       bfs(graph, i, level);
     }
   }
 
-  Mark = (char *)calloc(graph->numVertices,sizeof(char));
+  Mark = (char *)calloc(n, sizeof(char));
   assert_malloc(Mark);
 
   c1 = 0; c2 = 0;
-  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
-    s = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  for (UINT_t v = 0 ; v < n ; v++) {
+    s = Ap[v  ];
+    e = Ap[v+1];
     l = level[v];
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[graph->colInd[p]] = 1;
+      Mark[Ai[p]] = 1;
     
     for (UINT_t j = s ; j<e ; j++) {
-      w = graph->colInd[j];
+      w = Ai[j];
       if ((v < w) && (level[w] == l)) {
 	/* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
-	for (UINT_t k = graph->rowPtr[w]; k < graph->rowPtr[w+1] ; k++) {
-	  x = graph->colInd[k];
+	for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
+	  x = Ai[k];
 	  if (Mark[x]) {
 	    if (level[x] != l)
 	      c1++;
@@ -901,7 +905,7 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
     }
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[graph->colInd[p]] = 0;
+      Mark[Ai[p]] = 0;
   }
 
   free(Mark);
@@ -974,7 +978,6 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
     level[i] = NO_LEVEL;
   
   EMPTY = graph->numVertices;
-  bfs(graph, 0, level);
 
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
