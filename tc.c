@@ -8,7 +8,7 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
-#define LOOP_CNT       10
+#define LOOP_CNT        1
 #define SCALE_MIN       6
 #define DEBUG           0
 
@@ -231,10 +231,11 @@ const UINT_t n // A is n-by-n
 #endif
 #if 1
   char *restrict Mark = (char *) calloc (n, sizeof (char)) ;
+  assert_malloc(Mark);
 #else
   bool *restrict Mark = (bool *) calloc (n, sizeof (bool)) ;
-#endif
   if (Mark == NULL) return (-1) ;
+#endif
   UINT_t ntri = 0 ;
   for (UINT_t j = 0 ; j < n ; j++) {
     // scatter A(:,j) into Mark
@@ -626,7 +627,7 @@ UINT_t tc_low(
   UINT_t delta = 0 ; // number of triangles
 
   // for every vertex in V_{BR}
-# pragma omp parallel for schedule (dynamic) reduction (+ : delta)
+  // # pragma omp parallel for schedule (dynamic) reduction (+ : delta)
   for ( UINT_t i = 1 ; i<N-1; i ++ )
     {
       UINT_t *curr_row_x = IA + i ;
@@ -635,7 +636,7 @@ UINT_t tc_low(
       UINT_t *x_col_begin = ( JA + *curr_row_x);
       UINT_t *x_col_end = x_col_begin;
       UINT_t *row_bound = x_col_begin + num_nnz_curr_row_x;
-      UINT_t col_x_min = 0;
+      // UINT_t col_x_min = 0;
       UINT_t col_x_max = i - 1;
 
       // partition the current row into x and y, where x == a01 ^ T == a10t and y == a12t
@@ -847,6 +848,69 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_bader3(GRAPH_TYPE *graph) {
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t s, e, l, w;
+  UINT_t c1, c2;
+  UINT_t NO_LEVEL;
+  register UINT_t x;
+  char *Mark;
+
+  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(level);
+  NO_LEVEL = graph->numVertices;
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+    level[i] = NO_LEVEL;
+  
+  EMPTY = graph->numVertices;
+  bfs(graph, 0, level);
+
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+    if (level[i] == NO_LEVEL) {
+      bfs(graph, i, level);
+    }
+  }
+
+  Mark = (char *)calloc(graph->numVertices,sizeof(char));
+  assert_malloc(Mark);
+
+  c1 = 0; c2 = 0;
+  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
+    s = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    l = level[v];
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[graph->colInd[p]] = 1;
+    
+    for (UINT_t j = s ; j<e ; j++) {
+      w = graph->colInd[j];
+      if ((v < w) && (level[w] == l)) {
+	/* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
+	for (UINT_t k = graph->rowPtr[w]; k < graph->rowPtr[w+1] ; k++) {
+	  x = graph->colInd[k];
+	  if (Mark[x]) {
+	    if (level[x] != l)
+	      c1++;
+	    else
+	      c2++;
+	  }
+	}
+      }
+    }
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[graph->colInd[p]] = 0;
+  }
+
+  free(Mark);
+  free(level);
+
+  return c1 + (c2/3);
+}
+
+
 UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
@@ -885,9 +949,12 @@ UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UI
   return count;
 }
 
+
+
 #if 1
 UINT_t k;
 #endif
+
 
 UINT_t tc_bader2(GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
@@ -936,7 +1003,94 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
 }
 
 
+UINT_t* tc_bader2_bfs(GRAPH_TYPE *graph) {
+  /* Instead of c1, c2, use a single counter for triangles */
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t NO_LEVEL;
 
+  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(level);
+  NO_LEVEL = graph->numVertices;
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+    level[i] = NO_LEVEL;
+  
+  EMPTY = graph->numVertices;
+
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+    if (level[i] == NO_LEVEL) {
+      bfs(graph, i, level);
+    }
+  }
+
+  return level;
+}
+
+UINT_t tc_bader2_tc(GRAPH_TYPE *graph, UINT_t* level) {
+  /* Instead of c1, c2, use a single counter for triangles */
+  /* Direction orientied. */
+  UINT_t s, e, l, w;
+  UINT_t num_triangles = 0;
+#if 1
+  k=0;
+#endif
+
+  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
+    s = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      w = graph->colInd[j];
+      if ((v < w) && (level[w] == l)) {
+#if 1
+	k++;
+#endif
+	num_triangles += bader2_intersectSizeLinear(graph, level, v, w);
+      }
+    }
+  }
+
+  return num_triangles;
+}
+
+
+
+void runTC_bader2(UINT_t (*f)(GRAPH_TYPE*, UINT_t*), UINT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
+  int loop, err;
+  double 
+    total_time,
+    over_time;
+  UINT_t numTriangles;
+  UINT_t* level;
+
+  level = tc_bader2_bfs(originalGraph);
+  
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = (*f)(graph, level);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with %s\n",name);
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(stdout," scale: %2d \t tc: %12d \t %s: \t",
+	  scale,numTriangles,name);
+  if (strlen(name) <= 12) fprintf(stdout,"\t");
+  fprintf(stdout, " %9.6f\n",total_time);
+
+  free(level);
+
+}
  
 void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
   int loop, err;
@@ -1022,9 +1176,11 @@ main(int argc, char **argv) {
   runTC(tc_low, scale, originalGraph, graph, "tc_low");
   runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
   runTC(tc_bader2, scale, originalGraph, graph, "tc_bader2");
+  runTC_bader2(tc_bader2_tc, scale, originalGraph, graph, "tc_bader2 (bfs time excluded)");
 #if 1
   printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
 #endif
+  runTC(tc_bader3, scale, originalGraph, graph, "tc_bader3");
   runTC(tc_triples, scale, originalGraph, graph, "tc_triples");
   runTC(tc_triples_DO, scale, originalGraph, graph, "tc_triples_DO");
   
