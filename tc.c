@@ -48,6 +48,87 @@ void assert_malloc(void *ptr) {
     }
 }
 
+FILE *infile = NULL, *outfile = NULL;
+char *INFILENAME = NULL;
+int QUIET;
+int SCALE = 0;
+int PRINT = 0;
+
+void usage(void) {
+
+  printf("Triangle Counting\n\n");
+  printf("Usage:\n\n");
+  printf("Either one of these two must be selected:\n");
+  printf(" -f <filename>   [Input Graph]\n");
+  printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= 5) \n");
+  printf("Optional arguments:\n");
+  printf(" -o <filename>   [Output File]\n");
+  printf(" -p              [Print Input Graph]\n");
+  printf(" -q              [Turn on Quiet mode]\n");
+  exit (8);
+}
+
+void parseFlags(int argc, char **argv) {
+
+  if (argc < 1) usage();
+  infile = NULL;
+  QUIET = 0;
+
+  while ((argc > 1) && (argv[1][0] == '-')) {
+
+    switch (argv[1][1]) {
+
+    case 'f':
+      if (!QUIET)
+	printf("Input Graph: %s\n",argv[2]);
+      infile = fopen(argv[2], "r");
+      if (infile == NULL) usage();
+      INFILENAME = argv[2];
+      argv+=2;
+      argc-=2;
+      break;
+
+    case 'o':
+      if (!QUIET)
+	printf("Output file: %s\n",argv[2]);
+      outfile = fopen(argv[2], "a");
+      if (outfile == NULL) usage();
+      argv+=2;
+      argc-=2;
+      break;
+
+    case 'r':
+      SCALE = atoi(argv[2]);
+      if (!QUIET)
+	printf("RMAT Scale: %d\n",SCALE);
+      argv+=2;
+      argc-=2;
+      break;
+
+    case 'q':
+      QUIET = 1;
+      argv++;
+      argc--;
+      break;
+	
+    case 'p':
+      PRINT = 1;
+      argv++;
+      argc--;
+      break;
+	
+    default:
+      fprintf(stderr,"Wrong Argument: %s\n", argv[1]);
+      usage();
+    }
+
+  }
+
+  if ((INFILENAME == NULL) && (SCALE <= 5)) usage();
+  
+  return;
+}
+
 static UINT_t correctTriangleCount;
 /* Check the correctness of the triangle count.
    Return 1 if worked, 0 if failed */
@@ -65,9 +146,9 @@ void copy_graph(GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
 
 void allocate_graph(GRAPH_TYPE* graph) {
   graph->rowPtr = (UINT_t*)calloc((graph->numVertices + 1), sizeof(UINT_t));
-    assert_malloc(graph->rowPtr);
-    graph->colInd = (UINT_t*)calloc(graph->numEdges, sizeof(UINT_t));
-    assert_malloc(graph->colInd);
+  assert_malloc(graph->rowPtr);
+  graph->colInd = (UINT_t*)calloc(graph->numEdges, sizeof(UINT_t));
+  assert_malloc(graph->colInd);
 }
 
 void free_graph(GRAPH_TYPE* graph) {
@@ -199,16 +280,16 @@ void create_graph_RMAT(GRAPH_TYPE* graph, UINT_t scale) {
 
 
 void print_graph(const GRAPH_TYPE* graph) {
-    printf("Number of Vertices: %u\n", graph->numVertices);
-    printf("Number of Edges: %u\n", graph->numEdges);
-    printf("RowPtr: ");
-    for (UINT_t i = 0; i <= graph->numVertices; i++)
-        printf("%u ", graph->rowPtr[i]);
-    printf("\n");
-    printf("ColInd: ");
-    for (UINT_t i = 0; i < graph->numEdges; i++)
-        printf("%u ", graph->colInd[i]);
-    printf("\n");
+  fprintf(outfile,"Number of Vertices: %u\n", graph->numVertices);
+  fprintf(outfile,"Number of Edges: %u\n", graph->numEdges);
+  fprintf(outfile,"RowPtr: ");
+  for (UINT_t i = 0; i <= graph->numVertices; i++)
+    fprintf(outfile,"%u ", graph->rowPtr[i]);
+  fprintf(outfile,"\n");
+  fprintf(outfile,"ColInd: ");
+  for (UINT_t i = 0; i < graph->numEdges; i++)
+    fprintf(outfile,"%u ", graph->colInd[i]);
+  fprintf(outfile,"\n");
 }
 
 /* Algorithm from
@@ -1104,10 +1185,12 @@ void runTC_bader2(UINT_t (*f)(GRAPH_TYPE*, UINT_t*), UINT_t scale, GRAPH_TYPE *o
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  fprintf(stdout," scale: %2d \t tc: %12d \t %s: \t",
-	  scale,numTriangles,name);
-  if (strlen(name) <= 12) fprintf(stdout,"\t");
-  fprintf(stdout, " %9.6f\n",total_time);
+  if (!QUIET) {
+    fprintf(outfile," scale: %2d \t tc: %12d \t %s: \t",
+	    scale,numTriangles,name);
+    if (strlen(name) <= 12) fprintf(outfile,"\t");
+    fprintf(outfile, " %9.6f\n",total_time);
+  }
 
   free(level);
 
@@ -1138,75 +1221,133 @@ void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GR
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  fprintf(stdout," scale: %2d \t tc: %12d \t %s: \t",
-	  scale,numTriangles,name);
-  if (strlen(name) <= 12) fprintf(stdout,"\t");
-  fprintf(stdout, " %9.6f\n",total_time);
+  if (!QUIET) {
+    fprintf(outfile," scale: %2d \t tc: %12d \t %s: \t",
+	    scale,numTriangles,name);
+    if (strlen(name) <= 12) fprintf(outfile,"\t");
+    fprintf(outfile, " %9.6f\n",total_time);
+  }
 
 }
+
+
+void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
+  FILE *infile = fopen(filename, "r");
+  if (infile == NULL) {
+    printf("Error opening file %s.\n", filename);
+    exit(1);
+  }
+
+  char line[256];
+  UINT_t num_rows, num_cols, num_entries;
+
+  // Skip the header lines
+  do {
+    fgets(line, sizeof(line), infile);
+  } while (line[0] == '%');
+
+  sscanf(line, "%d %d %d", &num_rows, &num_cols, &num_entries);
+
+  graph->numVertices = num_rows;
+  graph->numEdges = num_entries;
+
+  graph->rowPtr = (UINT_t *)malloc((num_rows + 1) * sizeof(UINT_t));
+  assert_malloc(graph->rowPtr);
+  graph->colInd = (UINT_t *)malloc(num_entries * sizeof(UINT_t));
+  assert_malloc(graph->colInd);
+
+
+  UINT_t row = 0;
+  UINT_t col = 0;
+  double val;
+  while (fscanf(infile, "%d %d %lf", &row, &col, &val) == 3) {
+    graph->rowPtr[row]++;
+    graph->colInd[graph->rowPtr[row] - 1] = col;
+  }
+  
+  fclose(infile);
+
+}
+
+
 
 int
 main(int argc, char **argv) {
-  GRAPH_TYPE 
-    *originalGraph,
-    *graph;
-  UINT_t numTriangles;
-  int scale;
+  UINT_t numTriangles = 0;
 
-  if (argc <= 1)
-    scale = DEFAULT_SCALE;
-  else
-    scale = atoi(argv[1]);
+  outfile = stdout;
 
-  if (scale < SCALE_MIN) {
-    fprintf(stderr, "Scale must be %d or greater.\n",SCALE_MIN);
-    exit(-1);
-  }
+  parseFlags(argc, argv);
   
-#if DEBUG
-  fprintf(stdout,"Scale [%2d]\n",scale);
-#endif
-  
-  
-  originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(originalGraph);
-  allocate_graph_RMAT(scale, EDGE_FACTOR, originalGraph);
+  if (SCALE > 5) {
+    GRAPH_TYPE 
+      *originalGraph,
+      *graph;
+    originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+    assert_malloc(originalGraph);
+    allocate_graph_RMAT(SCALE, EDGE_FACTOR, originalGraph);
     
-  create_graph_RMAT(originalGraph, scale);
+    create_graph_RMAT(originalGraph, SCALE);
 
-#if DEBUG
-  print_graph(originalGraph);
-#endif
+    if (PRINT)
+      print_graph(originalGraph);
 
-  graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(graph);
-  allocate_graph_RMAT(scale, EDGE_FACTOR, graph);
+    graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+    assert_malloc(graph);
+    allocate_graph_RMAT(SCALE, EDGE_FACTOR, graph);
   
-  copy_graph(originalGraph, graph);
-  numTriangles = tc_wedge(graph);
-  correctTriangleCount = numTriangles;
+    copy_graph(originalGraph, graph);
+    numTriangles = tc_wedge(graph);
+    correctTriangleCount = numTriangles;
 
-  runTC(tc_wedge, scale, originalGraph, graph, "tc_wedge");
-  runTC(tc_wedge_DO, scale, originalGraph, graph, "tc_wedge_DO");
-  runTC(tc_intersectLin, scale, originalGraph, graph, "tc_intersectLin");
-  runTC(tc_intersectLin_DO, scale, originalGraph, graph, "tc_intersectLin_DO");
-  runTC(tc_intersectLog, scale, originalGraph, graph, "tc_intersectLog");
-  runTC(tc_intersectLog_DO, scale, originalGraph, graph, "tc_intersectLog_DO");
-  /*  runTC(tc_intersectPartition, scale, originalGraph, graph, "tc_intersectPartition"); */
-  runTC(tc_davis, scale, originalGraph, graph, "tc_davis");
-  runTC(tc_low, scale, originalGraph, graph, "tc_low");
-  runTC(tc_bader, scale, originalGraph, graph, "tc_bader");
-  runTC(tc_bader2, scale, originalGraph, graph, "tc_bader2");
-  runTC_bader2(tc_bader2_tc, scale, originalGraph, graph, "tc_bader2 (bfs time excluded)");
-#if 1
-  printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
-#endif
-  runTC(tc_bader3, scale, originalGraph, graph, "tc_bader3");
-  runTC(tc_triples, scale, originalGraph, graph, "tc_triples");
-  runTC(tc_triples_DO, scale, originalGraph, graph, "tc_triples_DO");
+    runTC(tc_wedge, SCALE, originalGraph, graph, "tc_wedge");
+    runTC(tc_wedge_DO, SCALE, originalGraph, graph, "tc_wedge_DO");
+    runTC(tc_intersectLin, SCALE, originalGraph, graph, "tc_intersectLin");
+    runTC(tc_intersectLin_DO, SCALE, originalGraph, graph, "tc_intersectLin_DO");
+    runTC(tc_intersectLog, SCALE, originalGraph, graph, "tc_intersectLog");
+    runTC(tc_intersectLog_DO, SCALE, originalGraph, graph, "tc_intersectLog_DO");
+    /*  runTC(tc_intersectPartition, SCALE, originalGraph, graph, "tc_intersectPartition"); */
+    runTC(tc_davis, SCALE, originalGraph, graph, "tc_davis");
+    runTC(tc_low, SCALE, originalGraph, graph, "tc_low");
+    runTC(tc_bader, SCALE, originalGraph, graph, "tc_bader");
+    runTC(tc_bader2, SCALE, originalGraph, graph, "tc_bader2");
+    runTC_bader2(tc_bader2_tc, SCALE, originalGraph, graph, "tc_bader2 (bfs time excluded)");
+    if (!QUIET)
+      printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
+    runTC(tc_bader3, SCALE, originalGraph, graph, "tc_bader3");
+    runTC(tc_triples, SCALE, originalGraph, graph, "tc_triples");
+    runTC(tc_triples_DO, SCALE, originalGraph, graph, "tc_triples_DO");
   
-  free_graph(originalGraph);
-  free_graph(graph);
+    free_graph(originalGraph);
+    free_graph(graph);
+  }
+
+  if (INFILENAME != NULL) {
+    GRAPH_TYPE* graph;
+    graph = malloc(sizeof(GRAPH_TYPE));
+    assert_malloc(graph);
+    
+    readMatrixMarketFile(INFILENAME, graph);
+
+    if (PRINT)
+      print_graph(graph);
+    
+    numTriangles = tc_bader3(graph);
+    
+    free_graph(graph);
+  }
+
+
+  if (!QUIET)
+    fprintf(outfile,"Number of Triangles: %12d\n",numTriangles);
+
+  fclose(outfile);
+  
   return(0);
 }
+
+
+
+
+
 
