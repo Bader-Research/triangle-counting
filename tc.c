@@ -59,7 +59,7 @@ void usage(void) {
   printf("Triangle Counting\n\n");
   printf("Usage:\n\n");
   printf("Either one of these two must be selected:\n");
-  printf(" -f <filename>   [Input Graph]\n");
+  printf(" -f <filename>   [Input Graph in Matrix Market format]\n");
   printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= 5) \n");
   printf("Optional arguments:\n");
   printf(" -o <filename>   [Output File]\n");
@@ -1230,6 +1230,136 @@ void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GR
 
 }
 
+void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
+  int loop, err;
+  double 
+    total_time,
+    over_time;
+  UINT_t numTriangles;
+  
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = (*f)(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with %s\n",name);
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+  if (!QUIET)
+    fprintf(outfile,"%9.6f \t tc: %12d \t %s\n", total_time, numTriangles, name);
+
+}
+
+void check_CSR(GRAPH_TYPE* graph) {
+  const UINT_t n = graph->numVertices;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  
+  for (UINT_t v = 0 ; v < n ; v++) {
+    UINT_t s = Ap[v];
+    UINT_t e = Ap[v+1];
+    UINT_t last = Ai[s];
+    for (UINT_t j=s+1 ; j<e ; j++) {
+      if (Ai[j]<=last) {
+	fprintf(stderr,"ERROR: Graph is not in CSR format with sorted edgelists\n");
+	exit(8);
+      }
+      last = Ai[j];
+    }
+  }
+  return;
+}
+
+typedef struct {
+  INT_t source;
+  INT_t destination;
+} Edge;
+
+int compareEdges(const void* a, const void* b) {
+  Edge* edgeA = (Edge*)a;
+  Edge* edgeB = (Edge*)b;
+  if (edgeA->source != edgeB->source)
+    return edgeA->source - edgeB->source;
+  /* edgeA->source == edgeB->source */
+  return edgeA->destination - edgeB->destination;
+}
+
+void sort_CSR(GRAPH_TYPE* graph) {
+#if 1
+  printf("sort_CSR: entry n: %d  m: %d \n",graph->numVertices, graph->numEdges);
+#endif
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t *restrict Ap = graph->rowPtr;
+  UINT_t *restrict Ai = graph->colInd;
+  
+  Edge* edges = malloc(m * sizeof(Edge));
+  assert_malloc(edges);
+    
+  UINT_t edgeIndex = 0;
+  for (UINT_t i = 0; i < n; i++) {
+    UINT_t s = Ap[i];
+    UINT_t e = Ap[i + 1];
+    for (UINT_t j = s; j < e; j++) {
+#if 1
+      if (edgeIndex > m) {
+	printf("ERROR: sort_CSR:  i: %d  edgeIndex: %d  m: %d \n",i, edgeIndex, m);
+	exit(8);
+      }
+#endif
+      edges[edgeIndex].source = (INT_t)i;
+      edges[edgeIndex].destination = (INT_t)Ai[j];
+      edgeIndex++;
+    }
+  }
+
+#if 1
+  printf("sort_CSR: m: %d edgeIndex %d\n",m, edgeIndex);
+  if (m != edgeIndex)
+    exit(8);
+#endif
+#if 0
+  for (int i=0 ; i<m ; i++)
+    printf("Original Edge %12d: (%12d, %12d)\n",i, edges[i].source, edges[i].destination);
+#endif
+
+  qsort(edges, m, sizeof(Edge), compareEdges);
+
+#if 0
+  for (int i=0 ; i<m ; i++)
+    printf("Edge %12d: (%12d, %12d)\n",i, edges[i].source, edges[i].destination);
+#endif
+
+  edgeIndex = 0;
+  for (UINT_t i = 0; i < n; i++) {
+    Ap[i] = edgeIndex;
+    UINT_t s = edgeIndex;
+    while (edgeIndex < m && (UINT_t)edges[edgeIndex].source == i) {
+      Ai[edgeIndex - s] = (UINT_t)edges[edgeIndex].destination;
+      edgeIndex++;
+    }
+  }
+  Ap[n] = edgeIndex;
+
+  free(edges);
+  return;
+}
+
+
+typedef struct {
+    UINT_t row;
+    UINT_t  col;
+} Entry;
 
 void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   FILE *infile = fopen(filename, "r");
@@ -1248,6 +1378,16 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
 
   sscanf(line, "%d %d %d", &num_rows, &num_cols, &num_entries);
 
+  if (num_rows != num_cols) {
+    fprintf(stderr,"ERROR: Matrix Market input file is not square: rows: %d  cols: %d  nnz: %d\n",
+	    num_rows, num_cols, num_entries);
+    exit(-1);
+  }
+
+#if DEBUG
+  printf("readMatrixMarketFile: %d %d %d\n",num_rows, num_cols, num_entries);
+#endif
+
   graph->numVertices = num_rows;
   graph->numEdges = num_entries;
 
@@ -1257,16 +1397,48 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   assert_malloc(graph->colInd);
 
 
-  UINT_t row = 0;
-  UINT_t col = 0;
-  double val;
-  while (fscanf(infile, "%d %d %lf", &row, &col, &val) == 3) {
-    graph->rowPtr[row]++;
-    graph->colInd[graph->rowPtr[row] - 1] = col;
+  // Read matrix entries
+  Entry* entries = (Entry*)malloc(num_entries * sizeof(Entry));
+  for (UINT_t i = 0; i < num_entries; i++) {
+    UINT_t row, col;
+    if (fscanf(infile, "%d %d\n", &row, &col) != 2) {
+      fprintf(stderr,"Invalid Matrix Market file.\n");
+      fclose(infile);
+      fclose(outfile);
+      exit(8);
+    }
+    entries[i].row = row - 1;
+    entries[i].col = col - 1;
+    graph->rowPtr[row-1]++;
   }
-  
-  fclose(infile);
 
+  // Compute row pointers
+  UINT_t prev = graph->rowPtr[0];
+  graph->rowPtr[0] = 0;
+  for (UINT_t i = 1; i <= num_rows; i++) {
+    UINT_t temp = graph->rowPtr[i];
+    graph->rowPtr[i] = graph->rowPtr[i - 1] + prev;
+    prev = temp;
+  }
+
+  // Assign column indices and values
+  for (UINT_t i = 0; i < num_entries; i++) {
+    UINT_t row = entries[i].row;
+    UINT_t index = graph->rowPtr[row];
+    graph->colInd[index] = entries[i].col;
+    graph->rowPtr[row]++;
+  }
+
+  // Shift row pointers
+  for (UINT_t i = num_rows; i > 0; i--) {
+    graph->rowPtr[i] = graph->rowPtr[i - 1];
+  }
+  graph->rowPtr[0] = 0;
+
+  free(entries);
+
+  fclose(infile);
+  return;
 }
 
 
@@ -1279,64 +1451,60 @@ main(int argc, char **argv) {
 
   parseFlags(argc, argv);
   
+  GRAPH_TYPE 
+    *originalGraph,
+    *graph;
+
+  originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(originalGraph);
+  graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph);
+
   if (SCALE > 5) {
-    GRAPH_TYPE 
-      *originalGraph,
-      *graph;
-    originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-    assert_malloc(originalGraph);
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, originalGraph);
-    
     create_graph_RMAT(originalGraph, SCALE);
-
-    if (PRINT)
-      print_graph(originalGraph);
-
-    graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-    assert_malloc(graph);
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, graph);
-  
-    copy_graph(originalGraph, graph);
-    numTriangles = tc_wedge(graph);
-    correctTriangleCount = numTriangles;
-
-    runTC(tc_wedge, SCALE, originalGraph, graph, "tc_wedge");
-    runTC(tc_wedge_DO, SCALE, originalGraph, graph, "tc_wedge_DO");
-    runTC(tc_intersectLin, SCALE, originalGraph, graph, "tc_intersectLin");
-    runTC(tc_intersectLin_DO, SCALE, originalGraph, graph, "tc_intersectLin_DO");
-    runTC(tc_intersectLog, SCALE, originalGraph, graph, "tc_intersectLog");
-    runTC(tc_intersectLog_DO, SCALE, originalGraph, graph, "tc_intersectLog_DO");
-    /*  runTC(tc_intersectPartition, SCALE, originalGraph, graph, "tc_intersectPartition"); */
-    runTC(tc_davis, SCALE, originalGraph, graph, "tc_davis");
-    runTC(tc_low, SCALE, originalGraph, graph, "tc_low");
-    runTC(tc_bader, SCALE, originalGraph, graph, "tc_bader");
-    runTC(tc_bader2, SCALE, originalGraph, graph, "tc_bader2");
-    runTC_bader2(tc_bader2_tc, SCALE, originalGraph, graph, "tc_bader2 (bfs time excluded)");
-    if (!QUIET)
-      printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
-    runTC(tc_bader3, SCALE, originalGraph, graph, "tc_bader3");
-    runTC(tc_triples, SCALE, originalGraph, graph, "tc_triples");
-    runTC(tc_triples_DO, SCALE, originalGraph, graph, "tc_triples_DO");
-  
-    free_graph(originalGraph);
-    free_graph(graph);
   }
-
+  
   if (INFILENAME != NULL) {
-    GRAPH_TYPE* graph;
-    graph = malloc(sizeof(GRAPH_TYPE));
-    assert_malloc(graph);
-    
-    readMatrixMarketFile(INFILENAME, graph);
-
-    if (PRINT)
-      print_graph(graph);
-    
-    numTriangles = tc_bader3(graph);
-    
-    free_graph(graph);
+    readMatrixMarketFile(INFILENAME, originalGraph);
+    sort_CSR(originalGraph);
+    graph->numVertices = originalGraph->numVertices;
+    graph->numEdges = originalGraph->numEdges;
+    allocate_graph(graph);
   }
 
+  check_CSR(originalGraph);
+  
+  if (PRINT)
+    print_graph(originalGraph);
+
+  copy_graph(originalGraph, graph);
+  numTriangles = tc_wedge(graph);
+  correctTriangleCount = numTriangles;
+
+  benchmarkTC(tc_wedge, originalGraph, graph, "tc_wedge");
+  benchmarkTC(tc_wedge_DO, originalGraph, graph, "tc_wedge_DO");
+  benchmarkTC(tc_intersectLin, originalGraph, graph, "tc_intersectLin");
+  benchmarkTC(tc_intersectLin_DO, originalGraph, graph, "tc_intersectLin_DO");
+  benchmarkTC(tc_intersectLog, originalGraph, graph, "tc_intersectLog");
+  benchmarkTC(tc_intersectLog_DO, originalGraph, graph, "tc_intersectLog_DO");
+  /*  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersectPartition"); */
+  benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
+  benchmarkTC(tc_low, originalGraph, graph, "tc_low");
+  benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
+  benchmarkTC(tc_bader2, originalGraph, graph, "tc_bader2");
+#if 0
+  runTC_bader2(tc_bader2_tc, originalGraph, SCALE, graph, "tc_bader2 (bfs time excluded)");
+  if (!QUIET)
+    printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
+#endif
+  benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
+  benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
+  benchmarkTC(tc_triples_DO, originalGraph, graph, "tc_triples_DO");
+  
+  free_graph(originalGraph);
+  free_graph(graph);
 
   if (!QUIET)
     fprintf(outfile,"Number of Triangles: %12d\n",numTriangles);
