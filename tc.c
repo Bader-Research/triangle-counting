@@ -178,6 +178,49 @@ int compareInt_t(const void *a, const void *b) {
     return 0;
 }
 
+void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  for (UINT_t i = 0 ; i < n + 1 ; i++)
+    Ap[i] = 0;
+
+  // Count the number of edges incident to each vertex
+  for (UINT_t i = 0; i < m; i++) {
+    UINT_t vertex = edges[i].src;
+    Ap[vertex + 1]++;
+  }
+
+  // Compute the prefix sum of the rowPtr array
+  for (UINT_t i = 1; i <= n; i++) {
+    Ap[i] += Ap[i - 1];
+  }
+
+  // Populate the col_idx array with the destination vertices
+  UINT_t *current_row = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(current_row);
+  for (UINT_t i = 0; i < m; i++) {
+    UINT_t src_vertex = edges[i].src;
+    UINT_t dst_vertex = edges[i].dst;
+    UINT_t index = Ap[src_vertex] + current_row[src_vertex];
+    Ai[index] = dst_vertex;
+    current_row[src_vertex]++;
+  }
+
+  // Sort the column indices within each row
+  for (UINT_t i = 0; i < graph->numVertices; i++) {
+    UINT_t start = Ap[i];
+    UINT_t end = Ap[i + 1];
+    UINT_t size = end - start;
+    UINT_t *row_indices = &Ai[start];
+    qsort(row_indices, size, sizeof(UINT_t), compareInt_t);
+  }
+
+  free(current_row);
+}
+
 void create_graph_RMAT(GRAPH_TYPE* graph, UINT_t scale) {
 
     register int good;
@@ -187,16 +230,7 @@ void create_graph_RMAT(GRAPH_TYPE* graph, UINT_t scale) {
     assert_malloc(edges);
 
     UINT_t e_start = 0;
-#if 0
-    for (UINT_t i = 0; i < graph->numVertices - 1 ; i++) {
-      edges[(2*i)  ].src = i;
-      edges[(2*i)  ].dst = i+1;
-      edges[(2*i)+1].src = i+1;
-      edges[(2*i)+1].dst = i;
-    }
-    e_start = 2*(graph->numVertices - 1);
-#endif
-    
+
     for (UINT_t e = e_start ; e < graph->numEdges ; e+=2) {
 
       good = 0;
@@ -240,41 +274,9 @@ void create_graph_RMAT(GRAPH_TYPE* graph, UINT_t scale) {
 #endif
     }
 
-    // Count the number of edges incident to each vertex
-    for (UINT_t i = 0; i < graph->numEdges; i++) {
-        UINT_t vertex = edges[i].src;
-        graph->rowPtr[vertex + 1]++;
-    }
-
-    // Compute the prefix sum of the rowPtr array
-    for (UINT_t i = 1; i <= graph->numVertices; i++) {
-      graph->rowPtr[i] += graph->rowPtr[i - 1];
-    }
-
-    // Populate the col_idx array with the destination vertices
-    UINT_t *current_row = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
-    assert_malloc(current_row);
-    for (UINT_t i = 0; i < graph->numEdges; i++) {
-        UINT_t src_vertex = edges[i].src;
-        UINT_t dst_vertex = edges[i].dst;
-        UINT_t index = graph->rowPtr[src_vertex] + current_row[src_vertex];
-        graph->colInd[index] = dst_vertex;
-        current_row[src_vertex]++;
-    }
-
-    // Sort the column indices within each row
-    for (UINT_t i = 0; i < graph->numVertices; i++) {
-      UINT_t start = graph->rowPtr[i];
-      UINT_t end = graph->rowPtr[i + 1];
-      UINT_t size = end - start;
-      UINT_t *row_indices = &graph->colInd[start];
-      qsort(row_indices, size, sizeof(UINT_t), compareInt_t);
-    }
-
-    free(current_row);
+    convert_edges_to_graph(edges,graph);
 
     free(edges);
-
 }
 
 
@@ -1196,40 +1198,6 @@ void runTC_bader2(UINT_t (*f)(GRAPH_TYPE*, UINT_t*), UINT_t scale, GRAPH_TYPE *o
 
 }
  
-void runTC(UINT_t (*f)(GRAPH_TYPE*), UINT_t scale, GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
-  int loop, err;
-  double 
-    total_time,
-    over_time;
-  UINT_t numTriangles;
-  
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = (*f)(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with %s\n",name);
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  if (!QUIET) {
-    fprintf(outfile," scale: %2d \t tc: %12d \t %s: \t",
-	    scale,numTriangles,name);
-    if (strlen(name) <= 12) fprintf(outfile,"\t");
-    fprintf(outfile, " %9.6f\n",total_time);
-  }
-
-}
-
 void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, char *name) {
   int loop, err;
   double 
@@ -1280,86 +1248,6 @@ void check_CSR(GRAPH_TYPE* graph) {
   return;
 }
 
-typedef struct {
-  INT_t source;
-  INT_t destination;
-} Edge;
-
-int compareEdges(const void* a, const void* b) {
-  Edge* edgeA = (Edge*)a;
-  Edge* edgeB = (Edge*)b;
-  if (edgeA->source != edgeB->source)
-    return edgeA->source - edgeB->source;
-  /* edgeA->source == edgeB->source */
-  return edgeA->destination - edgeB->destination;
-}
-
-void sort_CSR(GRAPH_TYPE* graph) {
-#if 1
-  printf("sort_CSR: entry n: %d  m: %d \n",graph->numVertices, graph->numEdges);
-#endif
-  const UINT_t n = graph->numVertices;
-  const UINT_t m = graph->numEdges;
-  UINT_t *restrict Ap = graph->rowPtr;
-  UINT_t *restrict Ai = graph->colInd;
-  
-  Edge* edges = malloc(m * sizeof(Edge));
-  assert_malloc(edges);
-    
-  UINT_t edgeIndex = 0;
-  for (UINT_t i = 0; i < n; i++) {
-    UINT_t s = Ap[i];
-    UINT_t e = Ap[i + 1];
-    for (UINT_t j = s; j < e; j++) {
-#if 1
-      if (edgeIndex > m) {
-	printf("ERROR: sort_CSR:  i: %d  edgeIndex: %d  m: %d \n",i, edgeIndex, m);
-	exit(8);
-      }
-#endif
-      edges[edgeIndex].source = (INT_t)i;
-      edges[edgeIndex].destination = (INT_t)Ai[j];
-      edgeIndex++;
-    }
-  }
-
-#if 1
-  printf("sort_CSR: m: %d edgeIndex %d\n",m, edgeIndex);
-  if (m != edgeIndex)
-    exit(8);
-#endif
-#if 0
-  for (int i=0 ; i<m ; i++)
-    printf("Original Edge %12d: (%12d, %12d)\n",i, edges[i].source, edges[i].destination);
-#endif
-
-  qsort(edges, m, sizeof(Edge), compareEdges);
-
-#if 0
-  for (int i=0 ; i<m ; i++)
-    printf("Edge %12d: (%12d, %12d)\n",i, edges[i].source, edges[i].destination);
-#endif
-
-  edgeIndex = 0;
-  for (UINT_t i = 0; i < n; i++) {
-    Ap[i] = edgeIndex;
-    UINT_t s = edgeIndex;
-    while (edgeIndex < m && (UINT_t)edges[edgeIndex].source == i) {
-      Ai[edgeIndex - s] = (UINT_t)edges[edgeIndex].destination;
-      edgeIndex++;
-    }
-  }
-  Ap[n] = edgeIndex;
-
-  free(edges);
-  return;
-}
-
-
-typedef struct {
-    UINT_t row;
-    UINT_t  col;
-} Entry;
 
 void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   FILE *infile = fopen(filename, "r");
@@ -1388,54 +1276,77 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   printf("readMatrixMarketFile: %d %d %d\n",num_rows, num_cols, num_entries);
 #endif
 
-  graph->numVertices = num_rows;
-  graph->numEdges = num_entries;
+  UINT_t edgeCount = 0;
+  edge_t* edges = (edge_t*)calloc(2*num_entries, sizeof(edge_t));
 
-  graph->rowPtr = (UINT_t *)malloc((num_rows + 1) * sizeof(UINT_t));
-  assert_malloc(graph->rowPtr);
-  graph->colInd = (UINT_t *)malloc(num_entries * sizeof(UINT_t));
-  assert_malloc(graph->colInd);
-
-
-  // Read matrix entries
-  Entry* entries = (Entry*)malloc(num_entries * sizeof(Entry));
   for (UINT_t i = 0; i < num_entries; i++) {
     UINT_t row, col;
     if (fscanf(infile, "%d %d\n", &row, &col) != 2) {
-      fprintf(stderr,"Invalid Matrix Market file.\n");
+      fprintf(stderr,"Invalid Matrix Market file: bad entry.\n");
       fclose(infile);
       fclose(outfile);
       exit(8);
     }
-    entries[i].row = row - 1;
-    entries[i].col = col - 1;
-    graph->rowPtr[row-1]++;
+    if ((row > num_rows) || (col > num_rows)) {
+      fprintf(stderr,"Invalid Matrix Market file: entry out of range.\n");
+      fclose(infile);
+      fclose(outfile);
+      exit(8);
+    }
+#if 1
+    printf("Read in %d %d\n",row, col);
+#endif
+
+    int dup = 0;
+    for (UINT_t j = 0; j<edgeCount ; j++)
+      if ((edges[j].src == row-1) && (edges[j].dst == col-1)) {
+	dup = 1;
+#if 1
+	printf("%d %d is dup\n",row, col);
+#endif
+      }
+    if (!dup) {
+#if 0
+      printf("%d %d is not dup\n",row, col);
+#endif
+      edges[edgeCount].src = row - 1;
+      edges[edgeCount].dst = col - 1;
+      edgeCount++;
+      /* graph->rowPtr[row-1]++; */
+      edges[edgeCount].dst = col - 1;
+      edges[edgeCount].src = row - 1;
+      edgeCount++;
+      /* graph->rowPtr[col-1]++; */
+    }
   }
 
-  // Compute row pointers
-  UINT_t prev = graph->rowPtr[0];
-  graph->rowPtr[0] = 0;
-  for (UINT_t i = 1; i <= num_rows; i++) {
-    UINT_t temp = graph->rowPtr[i];
-    graph->rowPtr[i] = graph->rowPtr[i - 1] + prev;
-    prev = temp;
-  }
+#if 1
+  printf("Here A 2*num_entries: %d edgeCount: %d \n",2*num_entries, edgeCount);
+#endif
 
-  // Assign column indices and values
-  for (UINT_t i = 0; i < num_entries; i++) {
-    UINT_t row = entries[i].row;
-    UINT_t index = graph->rowPtr[row];
-    graph->colInd[index] = entries[i].col;
-    graph->rowPtr[row]++;
-  }
+  graph->numVertices = num_rows;
+  graph->rowPtr = (UINT_t *)calloc((graph->numVertices + 1), sizeof(UINT_t));
+  assert_malloc(graph->rowPtr);
 
-  // Shift row pointers
-  for (UINT_t i = num_rows; i > 0; i--) {
-    graph->rowPtr[i] = graph->rowPtr[i - 1];
-  }
-  graph->rowPtr[0] = 0;
+  graph->numEdges = edgeCount;
+  graph->colInd = (UINT_t *)calloc(graph->numEdges, sizeof(UINT_t));
+  assert_malloc(graph->colInd);
 
-  free(entries);
+#if 1
+  printf("Here n: %d  m: %d\n",graph->numVertices, graph->numEdges);
+#endif
+
+  convert_edges_to_graph(edges, graph);
+
+#if 1
+  printf("Here after convert\n");
+#endif
+  
+  free(edges);
+
+#if 1
+  printf("Here after edges freed\n");
+#endif
 
   fclose(infile);
   return;
@@ -1468,13 +1379,12 @@ main(int argc, char **argv) {
   
   if (INFILENAME != NULL) {
     readMatrixMarketFile(INFILENAME, originalGraph);
-    sort_CSR(originalGraph);
     graph->numVertices = originalGraph->numVertices;
     graph->numEdges = originalGraph->numEdges;
     allocate_graph(graph);
   }
 
-  check_CSR(originalGraph);
+  /*  check_CSR(originalGraph); */
   
   if (PRINT)
     print_graph(originalGraph);
