@@ -9,7 +9,7 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
-#define LOOP_CNT        1
+#define LOOP_CNT       10
 #define SCALE_MIN       6
 #define DEBUG           0
 
@@ -46,6 +46,8 @@ void create_graph_RMAT(GRAPH_TYPE*, UINT_t);
 int check_edge(GRAPH_TYPE *, UINT_t, UINT_t);
 
 void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *, GRAPH_TYPE *, char *);
+
+double tc_bader_compute_k(GRAPH_TYPE *);
 
 void bfs(GRAPH_TYPE *, UINT_t, UINT_t*);
 
@@ -932,6 +934,50 @@ void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_
 }
 
 
+double tc_bader_compute_k(GRAPH_TYPE *graph) {
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t s, e, l, w;
+  UINT_t c1, c2;
+  UINT_t NO_LEVEL;
+  UINT_t k;
+
+  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(level);
+  NO_LEVEL = graph->numVertices;
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
+    level[i] = NO_LEVEL;
+  
+  EMPTY = graph->numVertices;
+
+  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
+    if (level[i] == NO_LEVEL) {
+      bfs(graph, i, level);
+    }
+  }
+
+  k = 0;
+  
+  c1 = 0; c2 = 0;
+  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
+    s = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      w = graph->colInd[j];
+      if ((v < w) && (level[w] == l)) {
+	k++;
+	bader_intersectSizeLinear(graph, level, v, w, &c1, &c2);
+      }
+    }
+  }
+
+
+  free(level);
+
+  return (2.0 * (double)k/(double)graph->numEdges);
+}
+
 UINT_t tc_bader(GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* level;
@@ -1391,6 +1437,8 @@ main(int argc, char **argv) {
   
   if (PRINT)
     print_graph(originalGraph);
+
+  fprintf(outfile,"%% of horizontal edges from bfs (k): %9.6f\n",tc_bader_compute_k(originalGraph));
 
   copy_graph(originalGraph, graph);
   numTriangles = tc_wedge(graph);
