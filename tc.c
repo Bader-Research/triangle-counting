@@ -30,6 +30,42 @@ typedef struct {
     UINT_t* colInd;
 } GRAPH_TYPE;
 
+typedef struct {
+  UINT_t src;
+  UINT_t dst;
+} edge_t;
+
+void print_graph(const GRAPH_TYPE*);
+void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
+void copy_graph(GRAPH_TYPE *, GRAPH_TYPE *);
+int check_triangleCount(GRAPH_TYPE *, UINT_t);
+void allocate_graph(GRAPH_TYPE*);
+void free_graph(GRAPH_TYPE*);
+void allocate_graph_RMAT(int, int, GRAPH_TYPE*);
+void create_graph_RMAT(GRAPH_TYPE*, UINT_t);
+int check_edge(GRAPH_TYPE *, UINT_t, UINT_t);
+
+void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *, GRAPH_TYPE *, char *);
+
+void bfs(GRAPH_TYPE *, UINT_t, UINT_t*);
+
+typedef struct {
+  UINT_t *items;
+  UINT_t front;
+  UINT_t rear;
+  UINT_t size;
+} Queue;
+
+Queue *createQueue(UINT_t);
+void free_queue(Queue *);
+int isEmpty(Queue *);
+int isFull(Queue *);
+void enqueue(Queue *, UINT_t);
+UINT_t dequeue(Queue *);
+
+
+
+
 #define ODD(n) ((n)&1)==1
 #define max(a,b) ((a)>(b)?(a):(b))
 #define min(a,b) ((a)<(b)?(a):(b))
@@ -165,11 +201,6 @@ void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
 }
 
 
-typedef struct {
-  UINT_t src;
-  UINT_t dst;
-} edge_t;
-
 int compareInt_t(const void *a, const void *b) {
     UINT_t arg1 = *(const UINT_t *)a;
     UINT_t arg2 = *(const UINT_t *)b;
@@ -219,6 +250,7 @@ void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
   }
 
   free(current_row);
+
 }
 
 void create_graph_RMAT(GRAPH_TYPE* graph, UINT_t scale) {
@@ -760,14 +792,6 @@ UINT_t tc_low(
 
 static UINT_t EMPTY;
 
-// Queue structure for BFS traversal
-typedef struct {
-  UINT_t *items;
-  UINT_t front;
-  UINT_t rear;
-  UINT_t size;
-} Queue;
-
 // Function to create a new queue
 Queue *createQueue(UINT_t size) {
   Queue *queue = (Queue *)malloc(sizeof(Queue));
@@ -1293,36 +1317,21 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
       fclose(outfile);
       exit(8);
     }
-#if 1
-    printf("Read in %d %d\n",row, col);
-#endif
 
     int dup = 0;
     for (UINT_t j = 0; j<edgeCount ; j++)
       if ((edges[j].src == row-1) && (edges[j].dst == col-1)) {
 	dup = 1;
-#if 1
-	printf("%d %d is dup\n",row, col);
-#endif
       }
     if (!dup) {
-#if 0
-      printf("%d %d is not dup\n",row, col);
-#endif
       edges[edgeCount].src = row - 1;
       edges[edgeCount].dst = col - 1;
       edgeCount++;
-      /* graph->rowPtr[row-1]++; */
-      edges[edgeCount].dst = col - 1;
-      edges[edgeCount].src = row - 1;
+      edges[edgeCount].src = col - 1;
+      edges[edgeCount].dst = row - 1;
       edgeCount++;
-      /* graph->rowPtr[col-1]++; */
     }
   }
-
-#if 1
-  printf("Here A 2*num_entries: %d edgeCount: %d \n",2*num_entries, edgeCount);
-#endif
 
   graph->numVertices = num_rows;
   graph->rowPtr = (UINT_t *)calloc((graph->numVertices + 1), sizeof(UINT_t));
@@ -1332,21 +1341,9 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   graph->colInd = (UINT_t *)calloc(graph->numEdges, sizeof(UINT_t));
   assert_malloc(graph->colInd);
 
-#if 1
-  printf("Here n: %d  m: %d\n",graph->numVertices, graph->numEdges);
-#endif
-
   convert_edges_to_graph(edges, graph);
 
-#if 1
-  printf("Here after convert\n");
-#endif
-  
   free(edges);
-
-#if 1
-  printf("Here after edges freed\n");
-#endif
 
   fclose(infile);
   return;
@@ -1371,17 +1368,23 @@ main(int argc, char **argv) {
   graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   assert_malloc(graph);
 
+
   if (SCALE > 5) {
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, originalGraph);
     create_graph_RMAT(originalGraph, SCALE);
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, graph);
   }
-  
-  if (INFILENAME != NULL) {
-    readMatrixMarketFile(INFILENAME, originalGraph);
-    graph->numVertices = originalGraph->numVertices;
-    graph->numEdges = originalGraph->numEdges;
-    allocate_graph(graph);
+  else {
+    if (INFILENAME != NULL) {
+      readMatrixMarketFile(INFILENAME, originalGraph);
+      graph->numVertices = originalGraph->numVertices;
+      graph->numEdges = originalGraph->numEdges;
+      allocate_graph(graph);
+    }
+    else {
+      fprintf(stderr,"ERROR: No input graph selected.\n");
+      exit(8);
+    }
   }
 
   /*  check_CSR(originalGraph); */
