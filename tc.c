@@ -49,8 +49,6 @@ void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *, GRAPH_TYPE *, char *);
 
 double tc_bader_compute_k(GRAPH_TYPE *);
 
-void bfs(GRAPH_TYPE *, UINT_t, UINT_t*);
-
 typedef struct {
   UINT_t *items;
   UINT_t front;
@@ -65,6 +63,8 @@ int isFull(Queue *);
 void enqueue(Queue *, UINT_t);
 UINT_t dequeue(Queue *);
 
+void bfs(GRAPH_TYPE *, UINT_t, UINT_t*);
+void bfs_mark_horizontal_edges(GRAPH_TYPE *, UINT_t, UINT_t*, Queue*, UINT_t*, bool*);
 
 
 
@@ -917,6 +917,37 @@ void bfs_bader3(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level, Queue* que
   }
 }
 
+void bfs_mark_horizontal_edges(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* level, Queue* queue, UINT_t* visited, bool* horiz) {
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+
+  visited[startVertex] = 1;
+  enqueue(queue, startVertex);
+  level[startVertex] = 1;
+  
+  while (!isEmpty(queue)) {
+    UINT_t currentVertex = dequeue(queue);
+    for (UINT_t i = Ap[currentVertex]; i < Ap[currentVertex + 1]; i++) {
+      UINT_t adjacentVertex = Ai[i];
+      if (!visited[adjacentVertex])  {
+	horiz[i] = 0;
+	visited[adjacentVertex] = 1;
+	enqueue(queue, adjacentVertex);
+	level[adjacentVertex] = level[currentVertex] + 1;
+      }
+      else{
+	if ((level[adjacentVertex] == 0) || (level[adjacentVertex] == level[currentVertex]))
+	  horiz[i] = 1;
+#if 0
+	else {
+	  horiz[i] = 0;
+	}
+#endif
+      }
+    }
+  }
+}
+
 
 
 void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
@@ -1044,7 +1075,7 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
   UINT_t* level;
   UINT_t c1, c2;
   register UINT_t x;
-  char *Mark;
+  bool *Mark;
   UINT_t *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
@@ -1058,7 +1089,7 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
 
   EMPTY = n;
 
-  Mark = (char *)calloc(n, sizeof(char));
+  Mark = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Mark);
 
   Queue *queue = createQueue(n);
@@ -1085,6 +1116,83 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
 	      c1++;
 	    else
 	      c2++;
+	  }
+	}
+      }
+    }
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[Ai[p]] = 0;
+  }
+
+  free_queue(queue);
+
+  free(Mark);
+  free(visited);
+  free(level);
+
+  return c1 + (c2/3);
+}
+
+
+
+UINT_t tc_bader4(GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t c1, c2;
+  register UINT_t x;
+  bool *Mark;
+  bool *horiz;
+  UINT_t *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(level);
+  
+  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(visited);
+
+  EMPTY = n;
+
+  Mark = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Mark);
+
+  horiz = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(horiz);
+
+  Queue *queue = createQueue(n);
+
+  c1 = 0; c2 = 0;
+  for (UINT_t v = 0 ; v < n ; v++) {
+    if (!level[v])
+      bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
+    const UINT_t s = Ap[v  ];
+    const UINT_t e = Ap[v+1];
+    const UINT_t l = level[v];
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[Ai[p]] = 1;
+    
+    for (UINT_t j = s ; j<e ; j++) {
+      if (horiz[j]) {
+	const UINT_t w = Ai[j];
+	if (v < w) {
+	  /* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
+	  for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
+	    x = Ai[k];
+	    if (Mark[x]) {
+	      if (level[x] != l)
+		c1++;
+	      else
+		c2++;
+	    }
 	  }
 	}
       }
@@ -1478,6 +1586,7 @@ main(int argc, char **argv) {
     printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
 #endif
   benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
+  benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
   if (NCUBED)
     benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
   if (NCUBED)
