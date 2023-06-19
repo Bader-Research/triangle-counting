@@ -935,19 +935,11 @@ void bfs_mark_horizontal_edges(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* le
 	enqueue(queue, adjacentVertex);
 	level[adjacentVertex] = level[currentVertex] + 1;
       }
-      else{
-	if ((level[adjacentVertex] == 0) || (level[adjacentVertex] == level[currentVertex]))
-	  horiz[i] = 1;
-#if 0
-	else {
-	  horiz[i] = 0;
-	}
-#endif
-      }
+      else 
+	horiz[i] = (level[adjacentVertex] == 0) || (level[adjacentVertex] == level[currentVertex]);
     }
   }
 }
-
 
 
 void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
@@ -1164,7 +1156,7 @@ UINT_t tc_bader4(GRAPH_TYPE *graph) {
   Mark = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Mark);
 
-  horiz = (bool *)calloc(m, sizeof(bool));
+  horiz = (bool *)malloc(m * sizeof(bool));
   assert_malloc(horiz);
 
   Queue *queue = createQueue(n);
