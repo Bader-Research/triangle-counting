@@ -91,6 +91,7 @@ char *INFILENAME = NULL;
 int QUIET;
 int SCALE = 0;
 int PRINT = 0;
+int NCUBED = 1;
 
 void usage(void) {
 
@@ -103,6 +104,7 @@ void usage(void) {
   printf(" -o <filename>   [Output File]\n");
   printf(" -p              [Print Input Graph]\n");
   printf(" -q              [Turn on Quiet mode]\n");
+  printf(" -x              [Do not run N^3 algorithms]\n");
   exit (8);
 }
 
@@ -151,6 +153,12 @@ void parseFlags(int argc, char **argv) {
 	
     case 'p':
       PRINT = 1;
+      argv++;
+      argc--;
+      break;
+	
+    case 'x':
+      NCUBED = 0;
       argv++;
       argc--;
       break;
@@ -1442,8 +1450,10 @@ main(int argc, char **argv) {
     printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
 #endif
   benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
-  benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
-  benchmarkTC(tc_triples_DO, originalGraph, graph, "tc_triples_DO");
+  if (NCUBED)
+    benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
+  if (NCUBED)
+    benchmarkTC(tc_triples_DO, originalGraph, graph, "tc_triples_DO");
   
   free_graph(originalGraph);
   free_graph(graph);
