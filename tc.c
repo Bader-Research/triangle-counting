@@ -1351,7 +1351,6 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
       exit(8);
     }
 
-#if 0
     int dup = 0;
     for (UINT_t j = 0; j<edgeCount ; j++)
       if ((edges[j].src == row-1) && (edges[j].dst == col-1)) {
@@ -1365,14 +1364,6 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
       edges[edgeCount].dst = row - 1;
       edgeCount++;
     }
-#else
-    edges[edgeCount].src = row - 1;
-    edges[edgeCount].dst = col - 1;
-    edgeCount++;
-    edges[edgeCount].src = col - 1;
-    edges[edgeCount].dst = row - 1;
-    edgeCount++;
-#endif
   }
 
   graph->numVertices = num_rows;
