@@ -211,6 +211,16 @@ void allocate_graph_RMAT(int scale, int edgeFactor, GRAPH_TYPE* graph) {
 }
 
 
+int compareEdge_t(const void *a, const void *b) {
+    edge_t arg1 = *(const edge_t *)a;
+    edge_t arg2 = *(const edge_t *)b;
+    if (arg1.src < arg2.src) return -1;
+    if (arg1.src > arg2.src) return 1;
+    if ((arg1.src == arg2.src) && (arg1.dst < arg2.dst)) return -1;
+    if ((arg1.src == arg2.src) && (arg1.dst > arg2.dst)) return 1;
+    return 0;
+}
+
 int compareInt_t(const void *a, const void *b) {
     UINT_t arg1 = *(const UINT_t *)a;
     UINT_t arg2 = *(const UINT_t *)b;
@@ -1335,6 +1345,7 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
 
   UINT_t edgeCount = 0;
   edge_t* edges = (edge_t*)calloc(2*num_entries, sizeof(edge_t));
+  assert_malloc(edges);
 
   for (UINT_t i = 0; i < num_entries; i++) {
     UINT_t row, col;
@@ -1351,31 +1362,48 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
       exit(8);
     }
 
-    int dup = 0;
-    for (UINT_t j = 0; j<edgeCount ; j++)
-      if ((edges[j].src == row-1) && (edges[j].dst == col-1)) {
-	dup = 1;
-      }
-    if (!dup) {
-      edges[edgeCount].src = row - 1;
-      edges[edgeCount].dst = col - 1;
-      edgeCount++;
-      edges[edgeCount].src = col - 1;
-      edges[edgeCount].dst = row - 1;
-      edgeCount++;
-    }
+    edges[edgeCount].src = row - 1;
+    edges[edgeCount].dst = col - 1;
+    edgeCount++;
+    edges[edgeCount].src = col - 1;
+    edges[edgeCount].dst = row - 1;
+    edgeCount++;
   }
 
+  qsort(edges, edgeCount, sizeof(edge_t), compareEdge_t);
+
+  edge_t* edgesNoDup = (edge_t*)calloc(2*num_entries, sizeof(edge_t));
+  assert_malloc(edgesNoDup);
+
+  UINT_t edgeCountNoDup;
+  edge_t lastedge;
+  lastedge.src = edges[0].src;
+  lastedge.dst = edges[0].dst;
+  edgesNoDup[0].src = edges[0].src;
+  edgesNoDup[0].dst = edges[0].dst;
+  edgeCountNoDup = 1;
+  for (UINT_t i=0 ; i<edgeCount ; i++) {
+    if (compareEdge_t(&lastedge,&edges[i])!=0) {
+      edgesNoDup[edgeCountNoDup].src = edges[i].src;
+      edgesNoDup[edgeCountNoDup].dst = edges[i].dst;
+      edgeCountNoDup++;
+      lastedge.src = edges[i].src;
+      lastedge.dst = edges[i].dst;
+    }
+  }
+    
+    
   graph->numVertices = num_rows;
   graph->rowPtr = (UINT_t *)calloc((graph->numVertices + 1), sizeof(UINT_t));
   assert_malloc(graph->rowPtr);
 
-  graph->numEdges = edgeCount;
+  graph->numEdges = edgeCountNoDup;
   graph->colInd = (UINT_t *)calloc(graph->numEdges, sizeof(UINT_t));
   assert_malloc(graph->colInd);
 
-  convert_edges_to_graph(edges, graph);
+  convert_edges_to_graph(edgesNoDup, graph);
 
+  free(edgesNoDup);
   free(edges);
 
   fclose(infile);
