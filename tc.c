@@ -1298,27 +1298,6 @@ void benchmarkTC(UINT_t (*f)(GRAPH_TYPE*), GRAPH_TYPE *originalGraph, GRAPH_TYPE
 
 }
 
-void check_CSR(GRAPH_TYPE* graph) {
-  const UINT_t n = graph->numVertices;
-  const UINT_t *restrict Ap = graph->rowPtr;
-  const UINT_t *restrict Ai = graph->colInd;
-  
-  for (UINT_t v = 0 ; v < n ; v++) {
-    UINT_t s = Ap[v];
-    UINT_t e = Ap[v+1];
-    UINT_t last = Ai[s];
-    for (UINT_t j=s+1 ; j<e ; j++) {
-      if (Ai[j]<=last) {
-	fprintf(stderr,"ERROR: Graph is not in CSR format with sorted edgelists\n");
-	exit(8);
-      }
-      last = Ai[j];
-    }
-  }
-  return;
-}
-
-
 void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   FILE *infile = fopen(filename, "r");
   if (infile == NULL) {
@@ -1433,12 +1412,14 @@ main(int argc, char **argv) {
     }
   }
 
-  /*  check_CSR(originalGraph); */
-  
+  if (!QUIET)
+    fprintf(outfile,"Graph has %d vertices and %d undirected edges.\n",originalGraph->numVertices,originalGraph->numEdges/2);
+
   if (PRINT)
     print_graph(originalGraph);
 
-  fprintf(outfile,"%% of horizontal edges from bfs (k): %9.6f\n",tc_bader_compute_k(originalGraph));
+  if (!QUIET)
+    fprintf(outfile,"%% of horizontal edges from bfs (k): %9.6f\n",tc_bader_compute_k(originalGraph));
 
   copy_graph(originalGraph, graph);
   numTriangles = tc_wedge(graph);
