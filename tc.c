@@ -613,7 +613,7 @@ UINT_t tc_intersectLin_DO(GRAPH_TYPE *graph) {
 }
 
 INT_t binarySearch(UINT_t* list, UINT_t start, UINT_t end, UINT_t target) {
-  INT_t s=start, e=end, mid;
+  register INT_t s=start, e=end, mid;
   while (s < e) {
     mid = s + (e - s) / 2;
     if (list[mid] == target)
@@ -685,41 +685,97 @@ UINT_t tc_intersectLog_DO(GRAPH_TYPE *graph) {
   return (num_triangles/3);
 }
 
- UINT_t searchLists_with_partitioning(UINT_t* list1, UINT_t start1, UINT_t end1, UINT_t* list2, UINT_t start2, UINT_t end2) {
-  UINT_t mid1, loc2;
-  INT_t result;
-  UINT_t count = 0;
-  if ((start1>=end1)||(start2>=end2))
-    return 0;
-  mid1 = start1 + (end1 - start1)/2;
+UINT_t binarySearch_partition(UINT_t* list, UINT_t start, UINT_t end, UINT_t target) {
+  register INT_t s=start, e=end, mid;
+  while (s < e) {
+    mid = s + (e - s) / 2;
+#if 0
+    if (mid >=e) {
+      printf("ERROR, binarypart: mid >= e\n");
+      exit(-1);
+    }
+#endif
+    if (list[mid] == target)
+      return mid;
 
-  result = binarySearch(list2, start2, end2, list1[mid1]); /* need a binary search that returns the item or the next higher position */
-  if (result >= 0) loc2 = result;
+    if (list[mid] < target)
+      s = mid + 1;
+    else
+      e = mid;
+  }
+  return s;
+}
+
+
+
+ UINT_t searchLists_with_partitioning(UINT_t* list1, INT_t s1, INT_t e1, UINT_t* list2, INT_t s2, INT_t e2) {
+  INT_t mid1, loc2;
+  UINT_t count = 0;
+
+  if ((s1>e1)||(s2>e2))
+    return 0;
   
+  mid1 = s1 + (e1 - s1)/2;
+
+#if 0
+  if (mid1 > e1) {
+    printf("ERROR: searchpart: mid1 > e1\n");
+    exit(-1);
+  }
+#endif
+
+  /* need a binary search that returns the item or the next higher position */
+  loc2 = binarySearch_partition(list2, s2, e2, list1[mid1]); 
+
+#if 0
+  if (loc2 > e2) {
+    printf("ERROR: searchpart loc2 (%d) > e2 (%d)\n",loc2,e2);
+    exit(-1);
+  }
+#endif
+
+  INT_t s11 = s1;
+  INT_t e11 = mid1 - 1;
+  INT_t s21 = s2;
+  INT_t e21 = loc2;
+
+  INT_t s12 = mid1 + 1;
+  INT_t e12 = e1;
+  INT_t s22 = loc2;
+  INT_t e22 = e2;
+
   if (list1[mid1] == list2[loc2]) {
     count++;
+    e21--;
+    s22++;
   }
-  count += searchLists_with_partitioning(list1, start1, mid1-1, list2, start2, loc2-1);
-  count += searchLists_with_partitioning(list1, mid1+1, end1, list2, loc2, end2);
+  count += searchLists_with_partitioning(list1, s11, e11, list2, s21, e21);
+  count += searchLists_with_partitioning(list1, s12, e12, list2, s22, e22);
   return count;
 }
 
 UINT_t intersectSizePartition(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
 
+#if 0
   if ((v<0) || (v >= graph->numVertices) || (w<0) || (w >= graph->numVertices)) {
     fprintf(stderr,"vertices out of range in intersectSize()\n");
     exit(-1);
   }
-  vb = graph->rowPtr[v  ];
-  ve = graph->rowPtr[v+1];
-  wb = graph->rowPtr[w  ];
-  we = graph->rowPtr[w+1];
+#endif
+  vb = Ap[v  ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
 
-  return searchLists_with_partitioning(graph->colInd, vb, ve, graph->colInd, wb, we);
+  return searchLists_with_partitioning((UINT_t *)Ai, (INT_t) vb, (INT_t)ve-1, (UINT_t *)Ai, (INT_t)wb, (INT_t)we-1);
 }
 
 UINT_t tc_intersectPartition(GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
+  
   register UINT_t v, w;
   register UINT_t b, e;
   UINT_t num_triangles = 0;
@@ -734,6 +790,27 @@ UINT_t tc_intersectPartition(GRAPH_TYPE *graph) {
   }
 
   return (num_triangles/6);
+}
+
+UINT_t tc_intersectPartition_DO(GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
+  /* Direction oriented. */
+  
+  register UINT_t v, w;
+  register UINT_t b, e;
+  UINT_t num_triangles = 0;
+
+  for (v = 0; v < graph->numVertices; v++) {
+    b = graph->rowPtr[v  ];
+    e = graph->rowPtr[v+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      w  = graph->colInd[i];
+      if (v < w)
+	num_triangles += intersectSizePartition(graph, v, w);
+    }
+  }
+
+  return (num_triangles/3);
 }
 
 
@@ -1567,7 +1644,8 @@ main(int argc, char **argv) {
   benchmarkTC(tc_intersectLin_DO, originalGraph, graph, "tc_intersectLin_DO");
   benchmarkTC(tc_intersectLog, originalGraph, graph, "tc_intersectLog");
   benchmarkTC(tc_intersectLog_DO, originalGraph, graph, "tc_intersectLog_DO");
-  /*  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersectPartition"); */
+  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersectPartition");
+  benchmarkTC(tc_intersectPartition_DO, originalGraph, graph, "tc_intersectPartition_DO");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
