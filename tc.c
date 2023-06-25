@@ -262,10 +262,10 @@ void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
 
   // Sort the column indices within each row
   for (UINT_t i = 0; i < graph->numVertices; i++) {
-    UINT_t start = Ap[i];
-    UINT_t end = Ap[i + 1];
-    UINT_t size = end - start;
-    UINT_t *row_indices = &Ai[start];
+    UINT_t s = Ap[i];
+    UINT_t e = Ap[i + 1];
+    UINT_t size = e - s;
+    UINT_t *row_indices = &Ai[s];
     qsort(row_indices, size, sizeof(UINT_t), compareInt_t);
   }
 
@@ -391,29 +391,29 @@ const UINT_t n // A is n-by-n
 
 UINT_t tc_wedge(GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  UINT_t* row_ptr = graph->rowPtr;
-  UINT_t* col_ind = graph->colInd;
-  UINT_t num_vertices = graph->numVertices;
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
 
-  for (UINT_t i = 0; i < num_vertices; i++) {
-    UINT_t start = row_ptr[i];
-    UINT_t end = row_ptr[i + 1];
+  for (UINT_t i = 0; i < n; i++) {
+    UINT_t s = Ap[i];
+    UINT_t e = Ap[i + 1];
 
-    for (UINT_t j = start; j < end; j++) {
-      UINT_t neighbor1 = col_ind[j];
+    for (UINT_t j = s; j < e; j++) {
+      UINT_t neighbor1 = Ai[j];
 
-      for (UINT_t k = start; k < end; k++) {
-	UINT_t neighbor2 = col_ind[k];
+      for (UINT_t k = s; k < e; k++) {
+	UINT_t neighbor2 = Ai[k];
 
 	if (neighbor1 != neighbor2) {
-	  UINT_t start_n1 = row_ptr[neighbor1];
-	  UINT_t end_n1 = row_ptr[neighbor1 + 1];
+	  UINT_t s_n1 = Ap[neighbor1];
+	  UINT_t e_n1 = Ap[neighbor1 + 1];
 	  
-	  for (UINT_t l = start_n1; l < end_n1; l++) {
-	    if (col_ind[l] == neighbor2) {
-	      num_triangles++;
+	  for (UINT_t l = s_n1; l < e_n1; l++) {
+	    if (Ai[l] == neighbor2) {
+	      count++;
 	      break;
 	    }
 	  }
@@ -422,37 +422,37 @@ UINT_t tc_wedge(GRAPH_TYPE *graph) {
     }
   }
 
-  return (num_triangles/6);
+  return (count/6);
 }
 
 UINT_t tc_wedge_DO(GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
   /* Direction oriented. */
   
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  UINT_t* row_ptr = graph->rowPtr;
-  UINT_t* col_ind = graph->colInd;
-  UINT_t num_vertices = graph->numVertices;
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
 
-  for (UINT_t i = 0; i < num_vertices; i++) {
-    UINT_t start = row_ptr[i];
-    UINT_t end = row_ptr[i + 1];
+  for (UINT_t i = 0; i < n; i++) {
+    UINT_t s = Ap[i];
+    UINT_t e = Ap[i + 1];
 
-    for (UINT_t j = start; j < end; j++) {
-      UINT_t neighbor1 = col_ind[j];
+    for (UINT_t j = s; j < e; j++) {
+      UINT_t neighbor1 = Ai[j];
       if (neighbor1 > i) {
 
-	for (UINT_t k = start; k < end; k++) {
-	  UINT_t neighbor2 = col_ind[k];
+	for (UINT_t k = s; k < e; k++) {
+	  UINT_t neighbor2 = Ai[k];
 
 	  if ((neighbor1 != neighbor2) && (neighbor2 > neighbor1)) {
-	    UINT_t start_n1 = row_ptr[neighbor1];
-	    UINT_t end_n1 = row_ptr[neighbor1 + 1];
+	    UINT_t s_n1 = Ap[neighbor1];
+	    UINT_t e_n1 = Ap[neighbor1 + 1];
 	  
-	    for (UINT_t l = start_n1; l < end_n1; l++) {
-	      if (col_ind[l] == neighbor2) {
-		num_triangles++;
+	    for (UINT_t l = s_n1; l < e_n1; l++) {
+	      if (Ai[l] == neighbor2) {
+		count++;
 		break;
 	      }
 	    }
@@ -462,64 +462,43 @@ UINT_t tc_wedge_DO(GRAPH_TYPE *graph) {
     }
   }
 
-  return num_triangles;
+  return count;
 }
 
 
 int check_edge(GRAPH_TYPE *graph, UINT_t src, UINT_t dst) {
   int exists = 0;
 
-  UINT_t start = graph->rowPtr[src];
-  UINT_t end = graph->rowPtr[src + 1];
-  for (UINT_t i = start; i < end; i++)
-    if (graph->colInd[i] == dst) exists = 1;
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+
+  UINT_t s = Ap[src];
+  UINT_t e = Ap[src + 1];
+  for (UINT_t i = s; i < e; i++)
+    if (Ai[i] == dst) exists = 1;
 
   return(exists);
 }
 
-#if 0
-UINT_t tc_wedge_DO2(GRAPH_TYPE *graph) {
-  /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
-  /* Direction oriented. */
-  register UINT_t i, j, k, n1, n2;
-  register UINT_t start, end;
-  UINT_t num_triangles = 0;
-
-  for (i = 0; i < graph->numVertices; i++) {
-    start = graph->rowPtr[i];
-    end = graph->rowPtr[i+1];
-    for (j = start ; j<end ; j++) {
-      n1 = graph->colInd[j];
-      if (n1 > i) 
-	for (k = start ; k<end ; k++) {
-	  n2 = graph->colInd[k];
-	  if ((n2 > n1) && check_edge(graph, n1, n2))
-	    num_triangles++;
-	}
-    }
-  }
-
-  return num_triangles;
-}
-#endif
   
 UINT_t tc_triples(GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   
   register UINT_t i, j, k;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
+  const UINT_t n = graph->numVertices;
 
-  for (i = 0; i < graph->numVertices; i++)
-    for (j = 0; j < graph->numVertices; j++)
-      for (k = 0; k < graph->numVertices; k++) {
+  for (i = 0; i < n; i++)
+    for (j = 0; j < n; j++)
+      for (k = 0; k < n; k++) {
 
 	if (check_edge(graph, i, j) && check_edge(graph, j, k) && check_edge(graph, k, i))
-	  num_triangles++;
+	  count++;
 
       }
 
-  return (num_triangles/6);
+  return (count/6);
 }
 
 UINT_t tc_triples_DO(GRAPH_TYPE *graph) {
@@ -527,89 +506,101 @@ UINT_t tc_triples_DO(GRAPH_TYPE *graph) {
   /* Direction oriented. */
   
   register UINT_t i, j, k;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
+  const UINT_t n = graph->numVertices;
 
-  for (i = 0; i < graph->numVertices; i++)
-    for (j = i; j < graph->numVertices; j++)
-      for (k = j; k < graph->numVertices; k++) {
+  for (i = 0; i < n; i++)
+    for (j = i; j < n; j++)
+      for (k = j; k < n; k++) {
 
 	if (check_edge(graph, i, j) && check_edge(graph, j, k) && check_edge(graph, k, i))
-	  num_triangles++;
+	  count++;
 
       }
 
-  return num_triangles;
+  return count;
 }
 
 
 
 
-UINT_t intersectSizeLinear(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
+UINT_t intersectSizeMergePath(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
   
-  vb = graph->rowPtr[v ];
-  ve = graph->rowPtr[v+1];
-  wb = graph->rowPtr[w  ];
-  we = graph->rowPtr[w+1];
+  vb = Ap[v ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
 
   ptr_v = vb;
   ptr_w = wb;
   while ((ptr_v < ve) && (ptr_w < we)) {
-    if (graph->colInd[ptr_v] == graph->colInd[ptr_w]) {
-      num_triangles++;
+    if (Ai[ptr_v] == Ai[ptr_w]) {
+      count++;
       ptr_v++;
       ptr_w++;
     }
     else
-      if (graph->colInd[ptr_v] < graph->colInd[ptr_w])
+      if (Ai[ptr_v] < Ai[ptr_w])
 	ptr_v++;
       else
 	ptr_w++;
   }
-  return num_triangles;
+  return count;
 }
 
-UINT_t tc_intersectLin(GRAPH_TYPE *graph) {
+UINT_t tc_intersectMergePath(GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w = graph->colInd[i];
-      num_triangles += intersectSizeLinear(graph, v, w);
+      w = Ai[i];
+      count += intersectSizeMergePath(graph, v, w);
     }
   }
 
-  return (num_triangles/6);
+  return (count/6);
 }
 
-UINT_t tc_intersectLin_DO(GRAPH_TYPE *graph) {
+UINT_t tc_intersectMergePath_DO(GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   /* Direction oriented. */
   
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w = graph->colInd[i];
+      w = Ai[i];
       if (v < w)
-	num_triangles += intersectSizeLinear(graph, v, w);
+	count += intersectSizeMergePath(graph, v, w);
     }
   }
 
-  return (num_triangles/3);
+  return (count/3);
 }
 
 INT_t binarySearch(UINT_t* list, UINT_t start, UINT_t end, UINT_t target) {
@@ -627,62 +618,75 @@ INT_t binarySearch(UINT_t* list, UINT_t start, UINT_t end, UINT_t target) {
   return -1;
 }
 
-UINT_t intersectSizeLog(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
+UINT_t intersectSizeBinarySearch(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
   UINT_t count=0;
-  if ((v<0) || (v >= graph->numVertices) || (w<0) || (w >= graph->numVertices)) {
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  if ((v<0) || (v >= n) || (w<0) || (w >= n)) {
     fprintf(stderr,"vertices out of range in intersectSize()\n");
     exit(-1);
   }
-  vb = graph->rowPtr[v  ];
-  ve = graph->rowPtr[v+1];
-  wb = graph->rowPtr[w  ];
-  we = graph->rowPtr[w+1];
+  vb = Ap[v  ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
 
   for (UINT_t i=vb ; i<ve ; i++)
-    if (binarySearch(graph->colInd, wb, we, graph->colInd[i])>=0) count++;
+    if (binarySearch((UINT_t *)Ai, wb, we, Ai[i])>=0) count++;
 
   return count;
 }
 
-UINT_t tc_intersectLog(GRAPH_TYPE *graph) {
+UINT_t tc_intersectBinarySearch(GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
 
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w  = graph->colInd[i];
-      num_triangles += intersectSizeLog(graph, v, w);
+      w  = Ai[i];
+      count += intersectSizeBinarySearch(graph, v, w);
     }
   }
 
-  return (num_triangles/6);
+  return (count/6);
 }
 
-UINT_t tc_intersectLog_DO(GRAPH_TYPE *graph) {
+UINT_t tc_intersectBinarySearch_DO(GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
   /* Direction oriented. */
 
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w  = graph->colInd[i];
+      w  = Ai[i];
       if (v < w)
-	num_triangles += intersectSizeLog(graph, v, w);
+	count += intersectSizeBinarySearch(graph, v, w);
     }
   }
 
-  return (num_triangles/3);
+  return (count/3);
 }
 
 UINT_t binarySearch_partition(UINT_t* list, UINT_t start, UINT_t end, UINT_t target) {
@@ -754,42 +758,28 @@ UINT_t binarySearch_partition(UINT_t* list, UINT_t start, UINT_t end, UINT_t tar
   return count;
 }
 
-UINT_t intersectSizePartition(GRAPH_TYPE* graph, UINT_t v, UINT_t w) {
-  register UINT_t vb, ve, wb, we;
-  const UINT_t *restrict Ap = graph->rowPtr;
-  const UINT_t *restrict Ai = graph->colInd;
-
-#if 0
-  if ((v<0) || (v >= graph->numVertices) || (w<0) || (w >= graph->numVertices)) {
-    fprintf(stderr,"vertices out of range in intersectSize()\n");
-    exit(-1);
-  }
-#endif
-  vb = Ap[v  ];
-  ve = Ap[v+1];
-  wb = Ap[w  ];
-  we = Ap[w+1];
-
-  return searchLists_with_partitioning((UINT_t *)Ai, (INT_t) vb, (INT_t)ve-1, (UINT_t *)Ai, (INT_t)wb, (INT_t)we-1);
-}
 
 UINT_t tc_intersectPartition(GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
   
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n ; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w  = graph->colInd[i];
-      num_triangles += intersectSizePartition(graph, v, w);
+      w  = Ai[i];
+      count += searchLists_with_partitioning((UINT_t *)Ai, (INT_t) Ap[v], (INT_t)Ap[v+1]-1, (UINT_t *)Ai, (INT_t)Ap[w], (INT_t)Ap[w+1]-1);
     }
   }
 
-  return (num_triangles/6);
+  return (count/6);
 }
 
 UINT_t tc_intersectPartition_DO(GRAPH_TYPE *graph) {
@@ -798,21 +788,115 @@ UINT_t tc_intersectPartition_DO(GRAPH_TYPE *graph) {
   
   register UINT_t v, w;
   register UINT_t b, e;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 
-  for (v = 0; v < graph->numVertices; v++) {
-    b = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  for (v = 0; v < n; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
     for (UINT_t i=b ; i<e ; i++) {
-      w  = graph->colInd[i];
+      w  = Ai[i];
       if (v < w)
-	num_triangles += intersectSizePartition(graph, v, w);
+	count += searchLists_with_partitioning((UINT_t *)Ai, (INT_t) Ap[v], (INT_t)Ap[v+1]-1, (UINT_t *)Ai, (INT_t)Ap[w], (INT_t)Ap[w+1]-1);
     }
   }
 
-  return (num_triangles/3);
+  return (count/3);
 }
 
+
+UINT_t intersectSizeHash(GRAPH_TYPE *graph, bool *Hash, UINT_t v, UINT_t w) {
+
+  register UINT_t vb, ve, wb, we;
+  UINT_t count = 0;
+  
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+
+  vb = Ap[v  ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
+
+  for (UINT_t i=vb ; i<ve ; i++)
+    Hash[Ai[i]] = true;
+
+  for (UINT_t i= wb; i<we ; i++)
+    if (Hash[Ai[i]]) count++;
+  
+  for (UINT_t i=vb ; i<ve ; i++)
+    Hash[Ai[i]] = false;
+
+  return count;
+}
+
+UINT_t tc_intersectHash(GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
+
+  register UINT_t v, w;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  bool *Hash;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  Hash = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(Hash);
+  
+  for (v = 0; v < n ; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      w  = Ai[i];
+      count += intersectSizeHash(graph, Hash, v, w);
+    }
+  }
+
+  free(Hash);
+
+  return (count/6);
+}
+
+
+UINT_t tc_intersectHash_DO(GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
+  /* Direction oriented. */
+
+  register UINT_t v, w;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  bool *Hash;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  Hash = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(Hash);
+  
+  for (v = 0; v < n ; v++) {
+    b = Ap[v  ];
+    e = Ap[v+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      w  = Ai[i];
+      if (v < w)
+	count += intersectSizeHash(graph, Hash, v, w);
+    }
+  }
+
+  free(Hash);
+
+  return (count/3);
+}
 
 /* T. M. Low, V. N. Rao, M. Lee, D. Popovici, F. Franchetti and S. McMillan,
    "First look: Linear algebra-based triangle counting without matrix multiplication,"
@@ -1019,7 +1103,7 @@ void bfs_mark_horizontal_edges(GRAPH_TYPE *graph, UINT_t startVertex, UINT_t* le
 }
 
 
-void bader_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
+void bader_intersectSizeMergePath(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w, UINT_t* c1, UINT_t* c2) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t level_v;
@@ -1085,7 +1169,7 @@ double tc_bader_compute_k(GRAPH_TYPE *graph) {
       w = graph->colInd[j];
       if ((v < w) && (level[w] == l)) {
 	k++;
-	bader_intersectSizeLinear(graph, level, v, w, &c1, &c2);
+	bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2);
       }
     }
   }
@@ -1125,7 +1209,7 @@ UINT_t tc_bader(GRAPH_TYPE *graph) {
     for (UINT_t j = s ; j<e ; j++) {
       w = graph->colInd[j];
       if ((v < w) && (level[w] == l))
-	bader_intersectSizeLinear(graph, level, v, w, &c1, &c2);
+	bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2);
     }
   }
 
@@ -1177,7 +1261,7 @@ UINT_t tc_bader3(GRAPH_TYPE *graph) {
     for (UINT_t j = s ; j<e ; j++) {
       const UINT_t w = Ai[j];
       if ((v < w) && (level[w] == l)) {
-	/* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
+	/* bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2); */
 	for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
 	  x = Ai[k];
 	  if (Mark[x]) {
@@ -1253,7 +1337,7 @@ UINT_t tc_bader4(GRAPH_TYPE *graph) {
       if (horiz[j]) {
 	const UINT_t w = Ai[j];
 	if (v < w) {
-	  /* bader_intersectSizeLinear(graph, level, v, w, &c1, &c2); */
+	  /* bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2); */
 	  for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
 	    x = Ai[k];
 	    if (Mark[x]) {
@@ -1356,7 +1440,7 @@ UINT_t tc_bader5(GRAPH_TYPE *graph) {
 }
 
 
-UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w) {
+UINT_t bader2_intersectSizeMergePath(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t vlist, wlist, level_v;
@@ -1406,7 +1490,7 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* level;
   UINT_t s, e, l, w;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
   UINT_t NO_LEVEL;
 #if 1
   k=0;
@@ -1436,14 +1520,14 @@ UINT_t tc_bader2(GRAPH_TYPE *graph) {
 #if 1
 	k++;
 #endif
-	num_triangles += bader2_intersectSizeLinear(graph, level, v, w);
+	count += bader2_intersectSizeMergePath(graph, level, v, w);
       }
     }
   }
 
   free(level);
 
-  return num_triangles;
+  return count;
 }
 
 
@@ -1474,7 +1558,7 @@ UINT_t tc_bader2_tc(GRAPH_TYPE *graph, UINT_t* level) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t s, e, l, w;
-  UINT_t num_triangles = 0;
+  UINT_t count = 0;
 #if 1
   k=0;
 #endif
@@ -1489,12 +1573,12 @@ UINT_t tc_bader2_tc(GRAPH_TYPE *graph, UINT_t* level) {
 #if 1
 	k++;
 #endif
-	num_triangles += bader2_intersectSizeLinear(graph, level, v, w);
+	count += bader2_intersectSizeMergePath(graph, level, v, w);
       }
     }
   }
 
-  return num_triangles;
+  return count;
 }
 
 
@@ -1715,12 +1799,14 @@ main(int argc, char **argv) {
 
   benchmarkTC(tc_wedge, originalGraph, graph, "tc_wedge");
   benchmarkTC(tc_wedge_DO, originalGraph, graph, "tc_wedge_DO");
-  benchmarkTC(tc_intersectLin, originalGraph, graph, "tc_intersectLin");
-  benchmarkTC(tc_intersectLin_DO, originalGraph, graph, "tc_intersectLin_DO");
-  benchmarkTC(tc_intersectLog, originalGraph, graph, "tc_intersectLog");
-  benchmarkTC(tc_intersectLog_DO, originalGraph, graph, "tc_intersectLog_DO");
-  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersectPartition");
-  benchmarkTC(tc_intersectPartition_DO, originalGraph, graph, "tc_intersectPartition_DO");
+  benchmarkTC(tc_intersectMergePath, originalGraph, graph, "tc_intersect_MergePath");
+  benchmarkTC(tc_intersectMergePath_DO, originalGraph, graph, "tc_intersect_MergePath_DO");
+  benchmarkTC(tc_intersectBinarySearch, originalGraph, graph, "tc_intersect_BinarySearch");
+  benchmarkTC(tc_intersectBinarySearch_DO, originalGraph, graph, "tc_intersect_BinarySearch_DO");
+  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersect_Partition");
+  benchmarkTC(tc_intersectPartition_DO, originalGraph, graph, "tc_intersect_Partition_DO");
+  benchmarkTC(tc_intersectHash, originalGraph, graph, "tc_intersect_Hash");
+  benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
