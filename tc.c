@@ -1281,6 +1281,81 @@ UINT_t tc_bader4(GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_bader5(GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Use directionality to only use one counter for triangles where v < w < x */
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t count;
+  register UINT_t x;
+  bool *Mark;
+  bool *horiz;
+  UINT_t *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(level);
+  
+  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(visited);
+
+  EMPTY = n;
+
+  Mark = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Mark);
+
+  horiz = (bool *)malloc(m * sizeof(bool));
+  assert_malloc(horiz);
+
+  Queue *queue = createQueue(n);
+
+  count = 0;
+  for (UINT_t v = 0 ; v < n ; v++) {
+    if (!level[v])
+      bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
+    const UINT_t s = Ap[v  ];
+    const UINT_t e = Ap[v+1];
+    const UINT_t l = level[v];
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[Ai[p]] = 1;
+    
+    for (UINT_t j = s ; j<e ; j++) {
+      if (horiz[j]) {
+	const UINT_t w = Ai[j];
+	if (v < w) {
+	  for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
+	    x = Ai[k];
+	    if (Mark[x]) {
+	      if ( (l != level[x]) || ((l == level[x]) && (w < x)) ) {
+		count++;
+	      }
+	    }
+	  }
+	}
+      }
+    }
+
+    for (UINT_t p = s ; p<e ; p++)
+      Mark[Ai[p]] = 0;
+  }
+
+  free_queue(queue);
+
+  free(Mark);
+  free(visited);
+  free(level);
+
+  return count;
+}
+
+
 UINT_t bader2_intersectSizeLinear(GRAPH_TYPE* graph, UINT_t* level, UINT_t v, UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
@@ -1657,6 +1732,7 @@ main(int argc, char **argv) {
 #endif
   benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
   benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
+  benchmarkTC(tc_bader5, originalGraph, graph, "tc_bader5");
   if (NCUBED)
     benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
   if (NCUBED)
