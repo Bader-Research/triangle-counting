@@ -1150,6 +1150,74 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+
+  register UINT_t vb, ve, wb, we;
+  UINT_t count = 0;
+  
+  const UINT_t* restrict Ap = graph->rowPtr;
+
+  vb = Ap[v  ];
+  ve = vb + Size[v];
+  wb = Ap[w  ];
+  we = wb + Size[w];
+
+  for (UINT_t i=vb ; i<ve ; i++)
+    Hash[A[i]] = true;
+
+  for (UINT_t i= wb; i<we ; i++)
+    if (Hash[A[i]]) count++;
+  
+  for (UINT_t i=vb ; i<ve ; i++)
+    Hash[A[i]] = false;
+
+  return count;
+}
+
+
+UINT_t tc_forward(const GRAPH_TYPE *graph) {
+  
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
+
+  register UINT_t s, t;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  bool* Hash = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(Hash);
+
+  UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(Size);
+  
+  UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
+  assert_malloc(A);
+
+  for (s = 0; s < n ; s++) {
+    b = Ap[s  ];
+    e = Ap[s+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      t  = Ai[i];
+      if (s<t) {
+	count += intersectSizeHash_forward(graph, Hash, s, t, A, Size);
+	A[Ap[t] + Size[t]] = s;
+	Size[t]++;
+      }
+    }
+  }
+
+  free(A);
+  free(Size);
+  free(Hash);
+  
+  return count;
+}
+
+
 
 
 
@@ -1829,7 +1897,7 @@ void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph
   total_time /= (double)LOOP_CNT;
 
   if (!QUIET)
-    fprintf(outfile,"%9.6f \t tc: %12d \t %s\n", total_time, numTriangles, name);
+    fprintf(outfile,"%9.6f \t tc: %12d \t %12d\t %12d\t %s\n", total_time, numTriangles, graph->numVertices, graph->numEdges, name);
 
 }
 
@@ -1989,6 +2057,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_intersectHash, originalGraph, graph, "tc_intersect_Hash");
   benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
   benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
+  benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
