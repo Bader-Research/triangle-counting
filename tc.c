@@ -634,8 +634,16 @@ UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v, const 
   wb = Ap[w  ];
   we = Ap[w+1];
 
-  for (UINT_t i=vb ; i<ve ; i++)
-    if (binarySearch((UINT_t *)Ai, wb, we, Ai[i])>=0) count++;
+  UINT_t size_v = ve-vb;
+  UINT_t size_w = we-wb;
+
+  if (size_v <= size_w) {
+    for (UINT_t i=vb ; i<ve ; i++)
+      if (binarySearch((UINT_t *)Ai, wb, we, Ai[i])>=0) count++;
+  } else {
+    for (UINT_t i=wb ; i<we ; i++)
+      if (binarySearch((UINT_t *)Ai, vb, ve, Ai[i])>=0) count++;
+  }
 
   return count;
 }
