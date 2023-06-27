@@ -140,6 +140,7 @@ void parseFlags(int argc, char **argv) {
       SCALE = atoi(argv[2]);
       if (!QUIET)
 	printf("RMAT Scale: %d\n",SCALE);
+      INFILENAME = "RMAT";
       argv+=2;
       argc-=2;
       break;
@@ -1144,7 +1145,6 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
   free(parent);
   // free(component);
   free(E);
-			     
 
   return count/2;
 }
@@ -1896,8 +1896,10 @@ void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph
   total_time -= over_time;
   total_time /= (double)LOOP_CNT;
 
-  if (!QUIET)
-    fprintf(outfile,"%9.6f \t tc: %12d \t %12d\t %12d\t %s\n", total_time, numTriangles, graph->numVertices, graph->numEdges, name);
+  fprintf(outfile,"TC\t%s\t%12d\t%12d\t%-30s\t%9.6f\t%12d\n",
+	  INFILENAME,
+	  graph->numVertices, graph->numEdges,
+	  name, total_time, numTriangles);
 
 }
 
@@ -2078,16 +2080,13 @@ main(int argc, char **argv) {
   free_graph(originalGraph);
   free_graph(graph);
 
+#if 0
   if (!QUIET)
     fprintf(outfile,"Number of Triangles: %12d\n",numTriangles);
+#endif
 
   fclose(outfile);
   
   return(0);
 }
-
-
-
-
-
 
