@@ -990,7 +990,7 @@ void bfs_treelist(const GRAPH_TYPE *graph, const bool* E, UINT_t* parent /* , UI
   assert_malloc(visited);
   for (UINT_t i=0 ; i<n ; i++)
     visited[i] = false;
-  
+
   // c = 0;
   for (UINT_t v=0 ; v<n ; v++) {
     if (!visited[v]) {
@@ -1229,6 +1229,7 @@ Queue *createQueue(UINT_t size) {
   assert_malloc(queue);
   queue->items = (UINT_t *)malloc(size * sizeof(UINT_t));
   assert_malloc(queue->items);
+  EMPTY = size;
   queue->front = EMPTY;
   queue->rear = EMPTY;
   queue->size = size;
@@ -1285,6 +1286,7 @@ UINT_t dequeue(Queue *queue) {
 void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
   UINT_t *visited = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
   assert_malloc(visited);
+
   Queue *queue = createQueue(graph->numVertices);
 
   visited[startVertex] = 1;
@@ -1400,8 +1402,6 @@ double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
     level[i] = NO_LEVEL;
   
-  EMPTY = graph->numVertices;
-
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
       bfs(graph, i, level);
@@ -1442,8 +1442,6 @@ UINT_t tc_bader(const GRAPH_TYPE *graph) {
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
     level[i] = NO_LEVEL;
   
-  EMPTY = graph->numVertices;
-
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
       bfs(graph, i, level);
@@ -1488,8 +1486,6 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   
   visited = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(visited);
-
-  EMPTY = n;
 
   Mark = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Mark);
@@ -1560,8 +1556,6 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   
   visited = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(visited);
-
-  EMPTY = n;
 
   Mark = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Mark);
@@ -1637,8 +1631,6 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   
   visited = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(visited);
-
-  EMPTY = n;
 
   Mark = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Mark);
@@ -1751,8 +1743,6 @@ UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
     level[i] = NO_LEVEL;
   
-  EMPTY = graph->numVertices;
-
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
       bfs(graph, i, level);
@@ -1792,8 +1782,6 @@ UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
     level[i] = NO_LEVEL;
   
-  EMPTY = graph->numVertices;
-
   for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
     if (level[i] == NO_LEVEL) {
       bfs(graph, i, level);
