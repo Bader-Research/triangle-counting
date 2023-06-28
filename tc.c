@@ -64,7 +64,7 @@ void enqueue(Queue *, UINT_t);
 UINT_t dequeue(Queue *);
 
 void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
-void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, UINT_t*, bool*);
+void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
 
 
 #define ODD(n) ((n)&1)==1
@@ -1310,12 +1310,12 @@ UINT_t dequeue(Queue *queue) {
 
 // Function to perform breadth-first search
 void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
-  UINT_t *visited = (UINT_t *)calloc(graph->numVertices, sizeof(UINT_t));
+  bool *visited = (bool *)calloc(graph->numVertices, sizeof(bool));
   assert_malloc(visited);
 
   Queue *queue = createQueue(graph->numVertices);
 
-  visited[startVertex] = 1;
+  visited[startVertex] = true;
   enqueue(queue, startVertex);
   level[startVertex] = 0;
   
@@ -1324,7 +1324,7 @@ void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
     for (UINT_t i = graph->rowPtr[currentVertex]; i < graph->rowPtr[currentVertex + 1]; i++) {
       UINT_t adjacentVertex = graph->colInd[i];
       if (!visited[adjacentVertex])  {
-	visited[adjacentVertex] = 1;
+	visited[adjacentVertex] = true;
 	enqueue(queue, adjacentVertex);
 	level[adjacentVertex] = level[currentVertex] + 1;
       }
@@ -1335,11 +1335,11 @@ void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
   free_queue(queue);
 }
 
-void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, UINT_t* visited) {
+void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
-  visited[startVertex] = 1;
+  visited[startVertex] = true;
   enqueue(queue, startVertex);
   level[startVertex] = 1;
   
@@ -1348,7 +1348,7 @@ void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level
     for (UINT_t i = Ap[currentVertex]; i < Ap[currentVertex + 1]; i++) {
       UINT_t adjacentVertex = Ai[i];
       if (!visited[adjacentVertex])  {
-	visited[adjacentVertex] = 1;
+	visited[adjacentVertex] = true;
 	enqueue(queue, adjacentVertex);
 	level[adjacentVertex] = level[currentVertex] + 1;
       }
@@ -1356,11 +1356,11 @@ void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level
   }
 }
 
-void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, UINT_t* visited, bool* horiz) {
+void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited, bool* horiz) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
-  visited[startVertex] = 1;
+  visited[startVertex] = true;
   enqueue(queue, startVertex);
   level[startVertex] = 1;
   
@@ -1369,8 +1369,8 @@ void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex
     for (UINT_t i = Ap[currentVertex]; i < Ap[currentVertex + 1]; i++) {
       UINT_t adjacentVertex = Ai[i];
       if (!visited[adjacentVertex])  {
-	horiz[i] = 0;
-	visited[adjacentVertex] = 1;
+	horiz[i] = false;
+	visited[adjacentVertex] = true;
 	enqueue(queue, adjacentVertex);
 	level[adjacentVertex] = level[currentVertex] + 1;
       }
@@ -1501,8 +1501,8 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   UINT_t* level;
   UINT_t c1, c2;
   register UINT_t x;
-  bool *Mark;
-  UINT_t *visited;
+  bool* Mark;
+  bool* visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -1510,7 +1510,7 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   level = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(level);
   
-  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
   Mark = (bool *)calloc(n, sizeof(bool));
@@ -1571,7 +1571,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   register UINT_t x;
   bool *Mark;
   bool *horiz;
-  UINT_t *visited;
+  bool *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -1580,7 +1580,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   level = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(level);
   
-  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
   Mark = (bool *)calloc(n, sizeof(bool));
@@ -1646,7 +1646,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   register UINT_t x;
   bool *Mark;
   bool *horiz;
-  UINT_t *visited;
+  bool *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -1655,7 +1655,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   level = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(level);
   
-  visited = (UINT_t *)calloc(n, sizeof(UINT_t));
+  visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
   Mark = (bool *)calloc(n, sizeof(bool));
