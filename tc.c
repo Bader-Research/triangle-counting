@@ -1983,6 +1983,18 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Direction orientied. */
+
+  GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph);
+  return tc_bader4(graph2);
+}
+
+
 UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
@@ -2434,6 +2446,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
   benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
   benchmarkTC(tc_bader5, originalGraph, graph, "tc_bader5");
+  benchmarkTC(tc_bader4_degreeOrder, originalGraph, graph, "tc_bader4_degreeOrder");
   if (NCUBED)
     benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
   if (NCUBED)
