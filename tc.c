@@ -9,7 +9,7 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
-#define LOOP_CNT        1
+#define LOOP_CNT       10
 #define SCALE_MIN       6
 #define DEBUG           0
 
