@@ -1348,6 +1348,35 @@ UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+  register UINT_t vb, ve, wb, we;
+  register UINT_t ptr_v, ptr_w;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  
+  vb = Ap[v  ];
+  ve = vb + Size[v];
+  wb = Ap[w  ];
+  we = wb + Size[w];
+
+  ptr_v = vb;
+  ptr_w = wb;
+  while ((ptr_v < ve) && (ptr_w < we)) {
+    if (A[ptr_v] == A[ptr_w]) {
+      count++;
+      ptr_v++;
+      ptr_w++;
+    }
+    else
+      if (A[ptr_v] < A[ptr_w])
+	ptr_v++;
+      else
+	ptr_w++;
+  }
+  return count;
+}
+
 UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
 
   register UINT_t vb, ve, wb, we;
@@ -1387,6 +1416,44 @@ UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT
 
 
 UINT_t tc_forward(const GRAPH_TYPE *graph) {
+  
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
+
+  register UINT_t s, t;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(Size);
+  
+  UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
+  assert_malloc(A);
+
+  for (s = 0; s < n ; s++) {
+    b = Ap[s  ];
+    e = Ap[s+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      t  = Ai[i];
+      if (s<t) {
+	count += intersectSizeMergePath_forward(graph, s, t, A, Size);
+	A[Ap[t] + Size[t]] = s;
+	Size[t]++;
+      }
+    }
+  }
+
+  free(A);
+  free(Size);
+  
+  return count;
+}
+
+UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1512,7 +1579,7 @@ GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
   return graph2;
 }
 
-UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1521,7 +1588,7 @@ UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
   GRAPH_TYPE *graph2;
   graph2 = reorder_graph_by_degree(graph);
 
-  count = tc_forward(graph2);
+  count = tc_forward_hash(graph2);
 
   free_graph(graph2);
   
@@ -2353,7 +2420,8 @@ main(int argc, char **argv) {
   benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
   benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
-  benchmarkTC(tc_forward_degreeOrder, originalGraph, graph, "tc_forward_degreeOrder");
+  benchmarkTC(tc_forward_hash, originalGraph, graph, "tc_forward_hash");
+  benchmarkTC(tc_forward_hash_degreeOrder, originalGraph, graph, "tc_forward_hash_degreeOrder");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
