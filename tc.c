@@ -44,6 +44,7 @@ void free_graph(GRAPH_TYPE*);
 void allocate_graph_RMAT(const int, const int, GRAPH_TYPE*);
 void create_graph_RMAT(GRAPH_TYPE*, const UINT_t);
 bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
+GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *);
 
 void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
 
@@ -1442,14 +1443,10 @@ int compareVertexDegree_t(const void *a, const void *b) {
     return 0;
 }
 
-
-UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
+GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
   
-/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
-
-  register UINT_t s, t;
+  register UINT_t s;
   register UINT_t b, e;
-  UINT_t count = 0;
 
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
@@ -1489,46 +1486,47 @@ UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
   for (UINT_t i=1 ; i<=n ; i++)
     Ap2[i] = Ap2[i-1] + Perm[i-1].degree;
 
+  UINT_t *reverse = (UINT_t *)malloc(n*sizeof(UINT_t));
+  assert_malloc(reverse);
+
+  for (UINT_t i=0 ; i<n ; i++)
+    reverse[Perm[i].index] = i;
+
   for (s = 0; s < n ; s++) {
     UINT_t ps = Perm[s].index;
     b = Ap[ps];
     e = Ap[ps+1];
     UINT_t d = 0;
     for (UINT_t i=b ; i<e ; i++) {
-      for (UINT_t j=0 ; j<n ; j++) {
-	if (Perm[j].index == Ai[i]) {
-	  Ai2[Ap2[s] + d] = j;
-	  break;
-	}
-      }
+      Ai2[Ap2[s] + d] = reverse[Ai[i]];
       d++;
     }
   }
 
-  for (s = 0; s < n ; s++) {
-    b = Ap2[s];
-    e = Ap2[s+1];
-    for (UINT_t i=b ; i<e ; i++) {
-      t  = Ai2[i];
-      if (s < t) {
-	count += intersectSizeHash_forward(graph2, Hash, s, t, A, Size);
-	A[Ap2[t] + Size[t]] = s;
-	Size[t]++;
-      }
-    }
-  }
-
-  free_graph(graph2);
+  free(reverse);
   free(Perm);
   free(A);
   free(Size);
   free(Hash);
   
-  return count;
+  return graph2;
 }
 
+UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
+  
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
+  UINT_t count = 0;
 
+  GRAPH_TYPE *graph2;
+  graph2 = reorder_graph_by_degree(graph);
+
+  count = tc_forward(graph2);
+
+  free_graph(graph2);
+  
+  return count;
+}
 
 
 static UINT_t EMPTY;
