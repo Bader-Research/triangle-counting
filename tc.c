@@ -471,11 +471,6 @@ bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
 
-#if 1
-  const UINT_t n = graph->numVertices;
-  if ((v>=n) || (w>=n)) return false;
-#endif
-
   UINT_t s = Ap[v];
   UINT_t e = Ap[v+1];
   for (UINT_t i = s; i < e; i++)
@@ -1143,23 +1138,12 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
       for (UINT_t j=s; j<e ; j++) {
 	if (E[j]) {
 	  UINT_t v = Ai[j];
-#if 0
-	  if (parent[v] != n) {
-	    if (parent[v] != u) {
-	      if (check_edge_treelist(graph, E, parent[u], v))
-		count++;
-	      else if (check_edge_treelist(graph, E, parent[v], u))
-		count++;
-	    }
-	  }
-#else
 	  if (parent[u] != v) {
 	    if (check_edge_treelist(graph, E, parent[u], v))
 	      count++;
 	    else if (check_edge_treelist(graph, E, parent[v], u))
 	      count++;
 	  }
-#endif
 	}
       }
     }
@@ -1228,14 +1212,14 @@ void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
   UINT_t n = graph->numVertices;
   UINT_t m = graph->numEdges;
 
-  UINT_t *E = (UINT_t *)malloc(m * sizeof(UINT_t));
+  bool *E = (bool *)malloc(m * sizeof(bool));
   assert_malloc(E);
 
   UINT_t *Size = (UINT_t *)malloc(n * sizeof(UINT_t));
   assert_malloc(Size);
 
   for (UINT_t i=0 ; i<m ; i++)
-    E[i] = 1;
+    E[i] = true;
 
   for (UINT_t v=0 ; v<n ; v++) {
     UINT_t s = Ap[v];
@@ -1243,12 +1227,12 @@ void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
     for (UINT_t i = s; i < e; i++) {
       UINT_t w = Ai[i];
       if (parent[w] == v) {
-	E[i] = 0;
+	E[i] = false;
 	UINT_t ws = Ap[w];
 	UINT_t we = Ap[w+1];
 	for (UINT_t j=ws ; j<we ; j++) {
 	  if (Ai[j] == v) {
-	    E[j] = 0;
+	    E[j] = false;
 	    break;
 	  }
 	}
@@ -1342,9 +1326,9 @@ UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
       for (UINT_t j=s; j<e ; j++) {
 	UINT_t v = Ai2[j];
 	if (parent[u] != v) {
-	  if (check_edge(graph2, parent[u], v))
+	  if ((parent[u] < n) && (check_edge(graph2, parent[u], v)))
 	    count++;
-	  else if (check_edge(graph2, parent[v], u))
+	  else if ((parent[v] < n) && (check_edge(graph2, parent[v], u)))
 	    count++;
 	}
       }
