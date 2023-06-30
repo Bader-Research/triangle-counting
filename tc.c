@@ -9,7 +9,7 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
-#define LOOP_CNT       10
+#define LOOP_CNT        1
 #define SCALE_MIN       6
 #define DEBUG           0
 
@@ -470,6 +470,11 @@ bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
 
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
+
+#if 1
+  const UINT_t n = graph->numVertices;
+  if ((v>=n) || (w>=n)) return false;
+#endif
 
   UINT_t s = Ap[v];
   UINT_t e = Ap[v+1];
@@ -1070,12 +1075,11 @@ void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *parent) {
   for (UINT_t v=0 ; v<n ; v++) {
     UINT_t s = Ap[v];
     UINT_t e = Ap[v+1];
-    for (UINT_t i = s; i < e; i++)
+    for (UINT_t i = s; i < e; i++) {
       if (E[i]) {
 	UINT_t w = Ai[i];
 	if (parent[w] == v) {
 	  E[i] = false;
-
 	  UINT_t ws = Ap[w];
 	  UINT_t we = Ap[w+1];
 	  for (UINT_t j=ws ; j<we ; j++) {
@@ -1085,8 +1089,8 @@ void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *parent) {
 	    }
 	  }
 	}
-      
       }
+    }
   }
   
   return;
@@ -1105,8 +1109,8 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
   const UINT_t m = graph->numEdges;
 
   // 1. While there remains an edge in E:
-  //   1a. compute a converting tree for each connected component of G;
-  //   1b. for each each (u, v) in none of these tree:
+  //   1a. compute a covering tree for each connected component of G;
+  //   1b. for each edge (u, v) in none of these trees:
   //     1ba. If (father(u), v) in E then output triangle (u, v, father(u))
   //     1bb. else If (father(v), u) in E then output triangle (u, v, father (v)
   //   1c. remove from E all the edges in these trees
@@ -1139,6 +1143,7 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
       for (UINT_t j=s; j<e ; j++) {
 	if (E[j]) {
 	  UINT_t v = Ai[j];
+#if 0
 	  if (parent[v] != n) {
 	    if (parent[v] != u) {
 	      if (check_edge_treelist(graph, E, parent[u], v))
@@ -1147,17 +1152,212 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
 		count++;
 	    }
 	  }
+#else
+	  if (parent[u] != v) {
+	    if (check_edge_treelist(graph, E, parent[u], v))
+	      count++;
+	    else if (check_edge_treelist(graph, E, parent[v], u))
+	      count++;
+	  }
+#endif
 	}
       }
     }
 
     remove_treelist(graph, E, parent);
-    
   }
   
   free(parent);
   // free(component);
   free(E);
+
+  return count/2;
+}
+
+
+void bfs_treelist2(const GRAPH_TYPE *graph, UINT_t* parent /* , UINT_t* component */) {
+
+  /* UINT_t c; */
+  
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  bool *visited = (bool *)malloc(n * sizeof(bool));
+  assert_malloc(visited);
+  for (UINT_t i=0 ; i<n ; i++)
+    visited[i] = false;
+
+  // c = 0;
+  for (UINT_t v=0 ; v<n ; v++) {
+    if (!visited[v]) {
+      // c++;
+  
+      Queue *queue = createQueue(n);
+
+      visited[v] = true;
+      // component[v] = c;
+      enqueue(queue, v);
+  
+      while (!isEmpty(queue)) {
+	UINT_t currentVertex = dequeue(queue);
+	UINT_t s = Ap[v];
+	UINT_t e = Ap[v+1];
+	for (UINT_t i = s; i < e ; i++) {
+	  UINT_t adjacentVertex = Ai[i];
+	  if (!visited[adjacentVertex])  {
+	    visited[adjacentVertex] = true;
+	    // component[adjacentVertex] = c;
+	    parent[adjacentVertex] = currentVertex;
+	    enqueue(queue, adjacentVertex);
+	  }
+	}
+      }
+      free_queue(queue);
+    }
+  }
+
+  free(visited);
+}
+
+
+void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
+
+  UINT_t *restrict Ap = graph->rowPtr;
+  UINT_t *restrict Ai = graph->colInd;
+  UINT_t n = graph->numVertices;
+  UINT_t m = graph->numEdges;
+
+  UINT_t *E = (UINT_t *)malloc(m * sizeof(UINT_t));
+  assert_malloc(E);
+
+  UINT_t *Size = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(Size);
+
+  for (UINT_t i=0 ; i<m ; i++)
+    E[i] = 1;
+
+  for (UINT_t v=0 ; v<n ; v++) {
+    UINT_t s = Ap[v];
+    UINT_t e = Ap[v+1];
+    for (UINT_t i = s; i < e; i++) {
+      UINT_t w = Ai[i];
+      if (parent[w] == v) {
+	E[i] = 0;
+	UINT_t ws = Ap[w];
+	UINT_t we = Ap[w+1];
+	for (UINT_t j=ws ; j<we ; j++) {
+	  if (Ai[j] == v) {
+	    E[j] = 0;
+	    break;
+	  }
+	}
+      }
+    }
+  }
+
+  UINT_t numEdges_new=0;
+  for (UINT_t i=0 ; i<m ; i++) {
+    if (E[i]) {
+      Ai[numEdges_new] = Ai[i];
+      numEdges_new++;
+    }
+  }
+
+  for (UINT_t v=0 ; v<n ; v++) {
+    Size[v] = 0;
+    UINT_t s = Ap[v];
+    UINT_t e = Ap[v+1];
+    for (UINT_t i = s; i < e; i++) {
+      if (E[i]) {
+	Size[v]++;
+      }
+    }
+  }
+
+  Ap[0] = 0;
+  for (UINT_t i=1 ; i<=n ; i++) {
+    Ap[i] = Ap[i-1] + Size[i-1];
+  }
+
+  graph->numEdges = numEdges_new;
+    
+  free(Size);
+  free(E);
+
+  return;
+}
+
+UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
+  /* Itai and Rodeh, SIAM Journal of Computing, 1978 */
+  UINT_t edges;
+  UINT_t count = 0;
+  UINT_t *parent;
+  // UINT_t* component;
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  // 1. While there remains an edge in E:
+  //   1a. compute a covering tree for each connected component of G;
+  //   1b. for each edge (u, v) in none of these trees:
+  //     1ba. If (father(u), v) in E then output triangle (u, v, father(u))
+  //     1bb. else If (father(v), u) in E then output triangle (u, v, father (v)
+  //   1c. remove from E all the edges in these trees
+
+
+  GRAPH_TYPE* graph2;
+
+  graph2 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph2);
+
+  graph2->numVertices = n;
+  graph2->numEdges = m;
+  allocate_graph(graph2);
+  copy_graph(graph, graph2);
+  
+  const UINT_t *restrict Ap2 = graph2->rowPtr;
+  const UINT_t *restrict Ai2 = graph2->colInd;
+
+  //  component = (UINT_t *)malloc(n * sizeof(UINT_t));
+  //  assert_malloc(component);
+    
+  parent = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(parent);
+
+  edges = m;
+    
+  while (edges>0) {
+
+    for (UINT_t i=0 ; i<n ; i++) {
+      // component[i] = 0;
+      parent[i] = n;
+    }
+
+    bfs_treelist2(graph2, parent /* , component */);
+
+    for (UINT_t u=0 ; u<n ; u++) {
+      UINT_t s = Ap2[u];
+      UINT_t e = Ap2[u+1];
+      for (UINT_t j=s; j<e ; j++) {
+	UINT_t v = Ai2[j];
+	if (parent[u] != v) {
+	  if (check_edge(graph2, parent[u], v))
+	    count++;
+	  else if (check_edge(graph2, parent[v], u))
+	    count++;
+	}
+      }
+    }
+
+    remove_treelist2(graph2, parent);
+    edges = graph2->numEdges;
+  }
+  
+  free(parent);
+  // free(component);
+
+  free_graph(graph2);
 
   return count/2;
 }
@@ -1995,12 +2195,8 @@ void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
     
     
   graph->numVertices = num_rows;
-  graph->rowPtr = (UINT_t *)calloc((graph->numVertices + 1), sizeof(UINT_t));
-  assert_malloc(graph->rowPtr);
-
   graph->numEdges = edgeCountNoDup;
-  graph->colInd = (UINT_t *)calloc(graph->numEdges, sizeof(UINT_t));
-  assert_malloc(graph->colInd);
+  allocate_graph(graph);
 
   convert_edges_to_graph(edgesNoDup, graph);
 
@@ -2073,6 +2269,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_intersectHash, originalGraph, graph, "tc_intersect_Hash");
   benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
   benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
+  benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
