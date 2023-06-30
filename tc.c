@@ -1215,8 +1215,8 @@ void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
   bool *E = (bool *)malloc(m * sizeof(bool));
   assert_malloc(E);
 
-  UINT_t *Size = (UINT_t *)malloc(n * sizeof(UINT_t));
-  assert_malloc(Size);
+  UINT_t *Degree = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(Degree);
 
   for (UINT_t i=0 ; i<m ; i++)
     E[i] = true;
@@ -1249,24 +1249,24 @@ void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
   }
 
   for (UINT_t v=0 ; v<n ; v++) {
-    Size[v] = 0;
+    Degree[v] = 0;
     UINT_t s = Ap[v];
     UINT_t e = Ap[v+1];
     for (UINT_t i = s; i < e; i++) {
       if (E[i]) {
-	Size[v]++;
+	Degree[v]++;
       }
     }
   }
 
   Ap[0] = 0;
   for (UINT_t i=1 ; i<=n ; i++) {
-    Ap[i] = Ap[i-1] + Size[i-1];
+    Ap[i] = Ap[i-1] + Degree[i-1];
   }
 
   graph->numEdges = numEdges_new;
     
-  free(Size);
+  free(Degree);
   free(E);
 
   return;
@@ -1420,6 +1420,106 @@ UINT_t tc_forward(const GRAPH_TYPE *graph) {
     }
   }
 
+  free(A);
+  free(Size);
+  free(Hash);
+  
+  return count;
+}
+
+typedef struct {
+  UINT_t degree;
+  UINT_t index;
+} vertexDegree_t;
+
+int compareVertexDegree_t(const void *a, const void *b) {
+    vertexDegree_t v1 = *(const vertexDegree_t *)a;
+    vertexDegree_t v2 = *(const vertexDegree_t *)b;
+    if (v1.degree > v2.degree) return -1;
+    if (v1.degree < v2.degree) return 1;
+    if (v1.index < v2.index) return -1;
+    if (v1.index > v2.index) return 1;
+    return 0;
+}
+
+
+UINT_t tc_forward_degreeOrder(const GRAPH_TYPE *graph) {
+  
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
+
+  register UINT_t s, t;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  bool* Hash = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(Hash);
+
+  UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(Size);
+  
+  UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
+  assert_malloc(A);
+
+  vertexDegree_t* Perm = (vertexDegree_t *)malloc(n * sizeof(vertexDegree_t));
+  assert_malloc(Perm);
+  
+  for (UINT_t i=0; i<n ; i++) {
+    Perm[i].degree = Ap[i+1] - Ap[i];
+    Perm[i].index  = i;
+  }
+
+  qsort(Perm, n, sizeof(vertexDegree_t), compareVertexDegree_t);
+
+  GRAPH_TYPE *graph2;
+  graph2 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph2);
+
+  graph2->numVertices = n;
+  graph2->numEdges = m;
+  allocate_graph(graph2);
+  UINT_t* restrict Ap2 = graph2->rowPtr;
+  UINT_t* restrict Ai2 = graph2->colInd;
+
+  Ap2[0] = 0;
+  for (UINT_t i=1 ; i<=n ; i++)
+    Ap2[i] = Ap2[i-1] + Perm[i-1].degree;
+
+  for (s = 0; s < n ; s++) {
+    UINT_t ps = Perm[s].index;
+    b = Ap[ps];
+    e = Ap[ps+1];
+    UINT_t d = 0;
+    for (UINT_t i=b ; i<e ; i++) {
+      for (UINT_t j=0 ; j<n ; j++) {
+	if (Perm[j].index == Ai[i]) {
+	  Ai2[Ap2[s] + d] = j;
+	  break;
+	}
+      }
+      d++;
+    }
+  }
+
+  for (s = 0; s < n ; s++) {
+    b = Ap2[s];
+    e = Ap2[s+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      t  = Ai2[i];
+      if (s < t) {
+	count += intersectSizeHash_forward(graph2, Hash, s, t, A, Size);
+	A[Ap2[t] + Size[t]] = s;
+	Size[t]++;
+      }
+    }
+  }
+
+  free_graph(graph2);
+  free(Perm);
   free(A);
   free(Size);
   free(Hash);
@@ -2255,6 +2355,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
   benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
+  benchmarkTC(tc_forward_degreeOrder, originalGraph, graph, "tc_forward_degreeOrder");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
