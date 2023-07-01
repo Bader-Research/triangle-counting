@@ -1849,13 +1849,13 @@ UINT_t tc_bader(const GRAPH_TYPE *graph) {
 
 UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
-  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Direction orientied. */
   UINT_t* level;
   UINT_t c1, c2;
   register UINT_t x;
-  bool* Mark;
+  bool* Hash;
   bool* visited;
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
@@ -1867,8 +1867,8 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
-  Mark = (bool *)calloc(n, sizeof(bool));
-  assert_malloc(Mark);
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
 
   Queue *queue = createQueue(n);
 
@@ -1881,7 +1881,7 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
     const UINT_t l = level[v];
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 1;
+      Hash[Ai[p]] = true;
     
     for (UINT_t j = s ; j<e ; j++) {
       const UINT_t w = Ai[j];
@@ -1889,7 +1889,7 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
 	/* bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2); */
 	for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
 	  x = Ai[k];
-	  if (Mark[x]) {
+	  if (Hash[x]) {
 	    if (level[x] != l)
 	      c1++;
 	    else
@@ -1900,12 +1900,12 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
     }
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 0;
+      Hash[Ai[p]] = false;
   }
 
   free_queue(queue);
 
-  free(Mark);
+  free(Hash);
   free(visited);
   free(level);
 
@@ -1916,14 +1916,14 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
 
 UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
-  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Mark horizontal edges during BFS */
   /* Direction orientied. */
   UINT_t* level;
   UINT_t c1, c2;
   register UINT_t x;
-  bool *Mark;
+  bool *Hash;
   bool *horiz;
   bool *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
@@ -1937,8 +1937,8 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
-  Mark = (bool *)calloc(n, sizeof(bool));
-  assert_malloc(Mark);
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
 
   horiz = (bool *)malloc(m * sizeof(bool));
   assert_malloc(horiz);
@@ -1954,7 +1954,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
     const UINT_t l = level[v];
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 1;
+      Hash[Ai[p]] = true;
     
     for (UINT_t j = s ; j<e ; j++) {
       if (horiz[j]) {
@@ -1963,7 +1963,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
 	  /* bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2); */
 	  for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
 	    x = Ai[k];
-	    if (Mark[x]) {
+	    if (Hash[x]) {
 	      if (level[x] != l)
 		c1++;
 	      else
@@ -1975,12 +1975,12 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
     }
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 0;
+      Hash[Ai[p]] = false;
   }
 
   free_queue(queue);
 
-  free(Mark);
+  free(Hash);
   free(visited);
   free(level);
 
@@ -1990,7 +1990,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
 
 UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
-  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Mark horizontal edges during BFS */
   /* Direction orientied. */
@@ -2002,7 +2002,7 @@ UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
 
 UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
-  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Mark horizontal edges during BFS */
   /* Use directionality to only use one counter for triangles where v < w < x */
@@ -2010,7 +2010,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   UINT_t* level;
   UINT_t count;
   register UINT_t x;
-  bool *Mark;
+  bool *Hash;
   bool *horiz;
   bool *visited;
   const UINT_t *restrict Ap = graph->rowPtr;
@@ -2024,8 +2024,8 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
-  Mark = (bool *)calloc(n, sizeof(bool));
-  assert_malloc(Mark);
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
 
   horiz = (bool *)malloc(m * sizeof(bool));
   assert_malloc(horiz);
@@ -2041,7 +2041,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
     const UINT_t l = level[v];
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 1;
+      Hash[Ai[p]] = true;
     
     for (UINT_t j = s ; j<e ; j++) {
       if (horiz[j]) {
@@ -2049,7 +2049,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
 	if (v < w) {
 	  for (UINT_t k = Ap[w]; k < Ap[w+1] ; k++) {
 	    x = Ai[k];
-	    if (Mark[x]) {
+	    if (Hash[x]) {
 	      if ( (l != level[x]) || ((l == level[x]) && (w < x)) ) {
 		count++;
 	      }
@@ -2060,12 +2060,12 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
     }
 
     for (UINT_t p = s ; p<e ; p++)
-      Mark[Ai[p]] = 0;
+      Hash[Ai[p]] = false;
   }
 
   free_queue(queue);
 
-  free(Mark);
+  free(Hash);
   free(visited);
   free(level);
 
@@ -2254,7 +2254,7 @@ void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, c
 
 UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
-  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Mark horizontal edges during BFS */
   /* Partition edges into two sets -- horizontal and non-horizontal (spanning two levels). */
@@ -2364,7 +2364,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
     }
 
     for (UINT_t j=s1 ; j<e1 ; j++)
-      Hash[Ai1[j]] = 0;
+      Hash[Ai1[j]] = false;
   }
   
   free_graph(graph1);
