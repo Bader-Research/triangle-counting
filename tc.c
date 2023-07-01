@@ -335,15 +335,20 @@ void create_graph_RMAT(GRAPH_TYPE* graph, const UINT_t scale) {
 
 
 void print_graph(const GRAPH_TYPE* graph) {
-  fprintf(outfile,"Number of Vertices: %u\n", graph->numVertices);
-  fprintf(outfile,"Number of Edges: %u\n", graph->numEdges);
+  const UINT_t* Ap = graph->rowPtr;
+  const UINT_t* Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  
+  fprintf(outfile,"Number of Vertices: %u\n", n);
+  fprintf(outfile,"Number of Edges: %u\n", m);
   fprintf(outfile,"RowPtr: ");
-  for (UINT_t i = 0; i <= graph->numVertices; i++)
-    fprintf(outfile,"%u ", graph->rowPtr[i]);
+  for (UINT_t i = 0; i <= n; i++)
+    fprintf(outfile,"%u ", Ap[i]);
   fprintf(outfile,"\n");
   fprintf(outfile,"ColInd: ");
-  for (UINT_t i = 0; i < graph->numEdges; i++)
-    fprintf(outfile,"%u ", graph->colInd[i]);
+  for (UINT_t i = 0; i < m; i++)
+    fprintf(outfile,"%u ", Ai[i]);
   fprintf(outfile,"\n");
 }
 
@@ -2245,7 +2250,142 @@ void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, c
   free(level);
 
 }
- 
+
+
+UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Mark array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Partition edges into two sets -- horizontal and non-horizontal (spanning two levels). */
+  /* Run hash intersections on the non-horizontal edge graph using the horizontal edges. */
+  /* Run forward_hash on the graph induced by the horizontal edges. */
+  /* Direction orientied. */
+  UINT_t* level;
+  UINT_t count;
+  bool *Hash;
+  bool *horiz;
+  bool *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(level);
+  
+  visited = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(visited);
+
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
+
+  horiz = (bool *)malloc(m * sizeof(bool));
+  assert_malloc(horiz);
+
+  Queue *queue = createQueue(n);
+
+  for (UINT_t v = 0 ; v < n ; v++) {
+    if (!level[v])
+      bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
+  }
+
+  GRAPH_TYPE *graph0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph0);
+  graph0->numVertices = n;
+  graph0->numEdges = m;
+  allocate_graph(graph0);
+  UINT_t* restrict Ap0 = graph0->rowPtr;
+  UINT_t* restrict Ai0 = graph0->colInd;
+
+  GRAPH_TYPE *graph1 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph1);
+  graph1->numVertices = n;
+  graph1->numEdges = m;
+  allocate_graph(graph1);
+  UINT_t* restrict Ap1 = graph1->rowPtr;
+  UINT_t* restrict Ai1 = graph1->colInd;
+
+  UINT_t edgeCountG0 = 0;
+  UINT_t edgeCountG1 = 0;
+  Ap0[0] = 0;
+  Ap1[0] = 0;
+  for (UINT_t v=0 ; v<n ; v++) {
+    register const UINT_t s = Ap[v];
+    register const UINT_t e = Ap[v+1];
+    register const UINT_t lv = level[v];
+    for (UINT_t j=s ; j<e ; j++) {
+      register UINT_t w = Ai[j];
+      if (lv == level[w]) {
+	/* add (v,w) to G0 */
+	Ai0[edgeCountG0] = w;
+	edgeCountG0++;
+      }
+      else {
+	/* add (v,w) to G1 */
+	Ai1[edgeCountG1] = w;
+	edgeCountG1++;
+      }
+    }
+    Ap0[v+1] = edgeCountG0;
+    Ap1[v+1] = edgeCountG1;
+  }
+
+  count = tc_forward_hash(graph0);
+
+#if 0
+  printf("G0:\n");
+  print_graph(graph0);
+  printf("G1:\n");
+  print_graph(graph1);
+#endif
+  
+  for (UINT_t v=0 ; v<n ; v++) {
+    register const UINT_t s  = Ap[v  ];
+    register const UINT_t e  = Ap[v+1];
+    register const UINT_t s1 = Ap1[v  ];
+    register const UINT_t e1 = Ap1[v+1];
+
+    for (UINT_t j=s1 ; j<e1 ; j++)
+      Hash[Ai1[j]] = true;
+    
+    for (UINT_t j=s ; j<e ; j++) {
+      if (horiz[j]) {
+	register const UINT_t w = Ai[j];
+	if (v < w) {
+	  for (UINT_t k = Ap1[w]; k < Ap1[w+1] ; k++) {
+	    register const UINT_t x = Ai1[k];
+	    if (Hash[x]) {
+	      count++;
+	    }
+	  }
+	}
+      }
+    }
+
+    for (UINT_t j=s1 ; j<e1 ; j++)
+      Hash[Ai1[j]] = 0;
+  }
+  
+  free_graph(graph1);
+  free_graph(graph0);
+  
+  free_queue(queue);
+
+  free(Hash);
+  free(visited);
+  free(level);
+
+#if 0
+  return c1 + (c2/3);
+#endif
+  return count;
+}
+
+
+
+
+
 void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
   int loop, err;
   double 
@@ -2429,8 +2569,6 @@ main(int argc, char **argv) {
   benchmarkTC(tc_intersectPartition_DO, originalGraph, graph, "tc_intersect_Partition_DO");
   benchmarkTC(tc_intersectHash, originalGraph, graph, "tc_intersect_Hash");
   benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
-  benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
-  benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
   benchmarkTC(tc_forward_hash, originalGraph, graph, "tc_forward_hash");
   benchmarkTC(tc_forward_hash_degreeOrder, originalGraph, graph, "tc_forward_hash_degreeOrder");
@@ -2447,6 +2585,9 @@ main(int argc, char **argv) {
   benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
   benchmarkTC(tc_bader5, originalGraph, graph, "tc_bader5");
   benchmarkTC(tc_bader4_degreeOrder, originalGraph, graph, "tc_bader4_degreeOrder");
+  benchmarkTC(tc_bader_forward_hash, originalGraph, graph, "tc_bader_forward_hash");
+  benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
+  benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   if (NCUBED)
     benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
   if (NCUBED)
