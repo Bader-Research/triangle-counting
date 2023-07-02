@@ -5,6 +5,12 @@ CFLAGS1 = -DGCC -Wall
 CFLAGS2 = -DGCC -Wall -funroll-loops -funroll-all-loops -O2
 CFLAGS3 = -DGCC -Wall -funroll-loops -funroll-all-loops -O3
 
+# Intel ICX
+#CC      = icx
+#CFLAGS1 = -DICX -Wall
+#CFLAGS2 = -DICX -Wall -O2
+#CFLAGS3 = -DICX -Wall -O3
+
 #all: tc tcO2 tcO3
 all: tcO2
 
