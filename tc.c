@@ -22,6 +22,11 @@
 
 #define UINT_t uint32_t
 #define INT_t int32_t
+#ifdef ICX
+#define UINT_t uint
+#define INT_t int
+#endif
+
 
 typedef struct {
     UINT_t numVertices;
@@ -2369,7 +2374,8 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   
   free_graph(graph1);
   free_graph(graph0);
-  
+
+  free(horiz);
   free(Hash);
   free(level);
 
@@ -2386,7 +2392,9 @@ UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 
 
   GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph);
-  return tc_bader_forward_hash(graph2);
+  UINT_t count = tc_bader_forward_hash(graph2);
+  free_graph(graph2);
+  return count;
 }
 
 
