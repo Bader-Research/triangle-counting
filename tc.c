@@ -2344,8 +2344,8 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   count = tc_forward_hash(graph0);
 
   for (UINT_t v=0 ; v<n ; v++) {
-    register const UINT_t s  = Ap0[v  ];
-    register const UINT_t e  = Ap0[v+1];
+    register const UINT_t s0 = Ap0[v  ];
+    register const UINT_t e0 = Ap0[v+1];
     register const UINT_t s1 = Ap1[v  ];
     register const UINT_t e1 = Ap1[v+1];
 
@@ -2354,7 +2354,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
       for (UINT_t j=s1 ; j<e1 ; j++)
 	Hash[Ai1[j]] = true;
     
-      for (UINT_t j=s ; j<e ; j++) {
+      for (UINT_t j=s0 ; j<e0 ; j++) {
 	register const UINT_t w = Ai0[j];
 	if (v < w) {
 	  for (UINT_t k = Ap1[w]; k < Ap1[w+1] ; k++) {
