@@ -1,4 +1,7 @@
 
+# build options
+OPTS = -DLOOP_CNT=1
+
 # GCC
 CC 	= gcc
 CFLAGS1 = -DGCC -Wall
@@ -15,13 +18,16 @@ CFLAGS3 = -DGCC -Wall -funroll-loops -funroll-all-loops -O3
 all: tcO2
 
 tc: tc.c
-	${CC} ${CFLAGS1} -o tc tc.c -lm
+	${CC} ${CFLAGS} ${CFLAGS1} ${OPTS} -o tc tc.c -lm
 
 tcO2: tc.c
-	${CC} ${CFLAGS2} -o tcO2 tc.c -lm
+	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -o tcO2 tc.c -lm
 
 tcO3: tc.c
-	${CC} ${CFLAGS3} -o tcO3 tc.c -lm
+	${CC} ${CFLAGS} ${CFLAGS3} ${OPTS} -o tcO3 tc.c -lm
+
+testO2: tcO2 roadNet-PA.mtx
+	./tcO2 -f roadNet-PA.mtx -x
 
 clean: 
 	rm -f core *~ \
