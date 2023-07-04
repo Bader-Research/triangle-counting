@@ -1,0 +1,6 @@
+core
+*.err
+*-
+tc
+tcO*
+*.mtx

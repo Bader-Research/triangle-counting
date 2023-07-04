@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <math.h>
 #include <sys/time.h>
 #include <limits.h>
@@ -9,7 +10,9 @@
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
+#ifndef LOOP_CNT
 #define LOOP_CNT       10
+#endif
 #define SCALE_MIN       6
 #define DEBUG           0
 
@@ -1411,7 +1414,7 @@ UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT
     s2 = vb;
     e2 = ve;
   }
-  
+
   for (UINT_t i=s1 ; i<e1 ; i++)
     Hash[A[i]] = true;
 
@@ -1463,7 +1466,7 @@ UINT_t tc_forward(const GRAPH_TYPE *graph) {
   return count;
 }
 
-UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_config_size(const GRAPH_TYPE *graph, UINT_t hashSize) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1476,7 +1479,7 @@ UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
 
-  bool* Hash = (bool *)calloc(m, sizeof(bool));
+  bool* Hash = (bool *)calloc( (hashSize == 0)? m: hashSize, sizeof(bool));
   assert_malloc(Hash);
 
   UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
@@ -1503,6 +1506,10 @@ UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   free(Hash);
   
   return count;
+}
+
+UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
+  return tc_forward_hash_config_size(graph, 0);
 }
 
 typedef struct {
@@ -1988,6 +1995,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   free(Hash);
   free(visited);
   free(level);
+  free(horiz);
 
   return c1 + (c2/3);
 }
@@ -2073,6 +2081,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   free(Hash);
   free(visited);
   free(level);
+  free(horiz);
 
   return count;
 }
@@ -2265,7 +2274,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   /* Partition edges into two sets -- horizontal and non-horizontal (spanning two levels). */
   /* Run hash intersections on the non-horizontal edge graph using the horizontal edges. */
   /* Run forward_hash on the graph induced by the horizontal edges. */
-  /* Direction orientied. */
+  /* Direction oriented. */
   UINT_t* level;
   UINT_t count;
   bool *Hash;
@@ -2282,7 +2291,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
-  Hash = (bool *)calloc(n, sizeof(bool));
+  Hash = (bool *)calloc(m, sizeof(bool));
   assert_malloc(Hash);
 
   horiz = (bool *)malloc(m * sizeof(bool));
@@ -2341,7 +2350,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   graph0->numEdges = edgeCountG0;
   graph1->numEdges = edgeCountG1;
 
-  count = tc_forward_hash(graph0);
+  count = tc_forward_hash_config_size(graph0, m);
 
   for (UINT_t v=0 ; v<n ; v++) {
     register const UINT_t s0 = Ap0[v  ];
