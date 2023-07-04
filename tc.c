@@ -1995,6 +1995,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   free(Hash);
   free(visited);
   free(level);
+  free(horiz);
 
   return c1 + (c2/3);
 }
@@ -2080,6 +2081,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   free(Hash);
   free(visited);
   free(level);
+  free(horiz);
 
   return count;
 }
