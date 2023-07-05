@@ -2133,12 +2133,6 @@ static UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_
 }
 
 
-
-#if 1
-static UINT_t k;
-#endif
-
-
 static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
@@ -2146,9 +2140,6 @@ static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   UINT_t s, e, l, w;
   UINT_t count = 0;
   UINT_t NO_LEVEL;
-#if 1
-  k=0;
-#endif
 
   level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
   assert_malloc(level);
@@ -2169,9 +2160,6 @@ static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
     for (UINT_t j = s ; j<e ; j++) {
       w = graph->colInd[j];
       if ((v < w) && (level[w] == l)) {
-#if 1
-	k++;
-#endif
 	count += bader2_intersectSizeMergePath(graph, level, v, w);
       }
     }
@@ -2180,96 +2168,6 @@ static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   free(level);
 
   return count;
-}
-
-
-static UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
-  /* Instead of c1, c2, use a single counter for triangles */
-  /* Direction orientied. */
-  UINT_t* restrict level;
-  UINT_t NO_LEVEL;
-
-  level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
-  assert_malloc(level);
-  NO_LEVEL = graph->numVertices;
-  for (UINT_t i = 0 ; i < graph->numVertices ; i++) 
-    level[i] = NO_LEVEL;
-  
-  for (UINT_t i = 0 ; i < graph->numVertices ; i++) {
-    if (level[i] == NO_LEVEL) {
-      bfs(graph, i, level);
-    }
-  }
-
-  return level;
-}
-
-static UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* restrict level) {
-  /* Instead of c1, c2, use a single counter for triangles */
-  /* Direction orientied. */
-  UINT_t s, e, l, w;
-  UINT_t count = 0;
-#if 1
-  k=0;
-#endif
-
-  for (UINT_t v = 0 ; v < graph->numVertices ; v++) {
-    s = graph->rowPtr[v  ];
-    e = graph->rowPtr[v+1];
-    l = level[v];
-    for (UINT_t j = s ; j<e ; j++) {
-      w = graph->colInd[j];
-      if ((v < w) && (level[w] == l)) {
-#if 1
-	k++;
-#endif
-	count += bader2_intersectSizeMergePath(graph, level, v, w);
-      }
-    }
-  }
-
-  return count;
-}
-
-
-
-static void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
-  int loop, err;
-  double 
-    total_time,
-    over_time;
-  UINT_t numTriangles;
-  UINT_t* restrict level;
-
-  level = tc_bader2_bfs(originalGraph);
-  
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = (*f)(graph, level);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with %s\n",name);
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  if (!QUIET) {
-    fprintf(outfile," scale: %2d \t tc: %12d \t %s: \t",
-	    scale,numTriangles,name);
-    if (strlen(name) <= 12) fprintf(outfile,"\t");
-    fprintf(outfile, " %9.6f\n",total_time);
-  }
-
-  free(level);
-
 }
 
 
@@ -2605,11 +2503,6 @@ main(int argc, char **argv) {
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
   benchmarkTC(tc_bader2, originalGraph, graph, "tc_bader2");
-#if 0
-  runTC_bader2(tc_bader2_tc, originalGraph, SCALE, graph, "tc_bader2 (bfs time excluded)");
-  if (!QUIET)
-    printf("k: %f\n",2.0 * (double)k/(double)graph->numEdges);
-#endif
   benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
   benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
   benchmarkTC(tc_bader5, originalGraph, graph, "tc_bader5");
