@@ -43,20 +43,20 @@ typedef struct {
   UINT_t dst;
 } edge_t;
 
-void print_graph(const GRAPH_TYPE*);
-void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
-void copy_graph(const GRAPH_TYPE *, GRAPH_TYPE *);
-bool check_triangleCount(const GRAPH_TYPE *, const UINT_t);
-void allocate_graph(GRAPH_TYPE*);
-void free_graph(GRAPH_TYPE*);
-void allocate_graph_RMAT(const int, const int, GRAPH_TYPE*);
-void create_graph_RMAT(GRAPH_TYPE*, const UINT_t);
-bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
-GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *);
+static void print_graph(const GRAPH_TYPE*);
+static void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
+static void copy_graph(const GRAPH_TYPE *, GRAPH_TYPE *);
+static bool check_triangleCount(const GRAPH_TYPE *, const UINT_t);
+static void allocate_graph(GRAPH_TYPE*);
+static void free_graph(GRAPH_TYPE*);
+static void allocate_graph_RMAT(const int, const int, GRAPH_TYPE*);
+static void create_graph_RMAT(GRAPH_TYPE*, const UINT_t);
+static bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
+static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *);
 
-void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
+static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
 
-double tc_bader_compute_k(const GRAPH_TYPE *);
+static double tc_bader_compute_k(const GRAPH_TYPE *);
 
 typedef struct {
   UINT_t *items;
@@ -65,15 +65,15 @@ typedef struct {
   UINT_t size;
 } Queue;
 
-Queue *createQueue(UINT_t);
-void free_queue(Queue *);
-int isEmpty(Queue *);
-int isFull(Queue *);
-void enqueue(Queue *, UINT_t);
-UINT_t dequeue(Queue *);
+static Queue *createQueue(UINT_t);
+static void free_queue(Queue *);
+static int isEmpty(Queue *);
+static int isFull(Queue *);
+static void enqueue(Queue *, UINT_t);
+static UINT_t dequeue(Queue *);
 
-void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
-void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
+static void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
+static void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
 
 
 #define ODD(n) ((n)&1)==1
@@ -87,21 +87,21 @@ struct timezone tzp;
                         (double)tp.tv_sec + (double)tp.tv_usec / 1000000.0)
 
 
-void assert_malloc(const void *ptr) {
+static void assert_malloc(const void *ptr) {
     if (ptr==NULL) {
 	fprintf(stderr,"ERROR: Null pointer\n");
 	exit(1);
     }
 }
 
-FILE *infile = NULL, *outfile = NULL;
-char *INFILENAME = NULL;
-int QUIET;
-int SCALE = 0;
-int PRINT = 0;
-int NCUBED = 1;
+static FILE *infile = NULL, *outfile = NULL;
+static char *INFILENAME = NULL;
+static int QUIET;
+static int SCALE = 0;
+static int PRINT = 0;
+static int NCUBED = 1;
 
-void usage(void) {
+static void usage(void) {
 
   printf("Triangle Counting\n\n");
   printf("Usage:\n\n");
@@ -116,7 +116,7 @@ void usage(void) {
   exit (8);
 }
 
-void parseFlags(int argc, char **argv) {
+static void parseFlags(int argc, char **argv) {
 
   if (argc < 1) usage();
   infile = NULL;
@@ -192,27 +192,27 @@ bool check_triangleCount(const GRAPH_TYPE *graph, const UINT_t numTriangles) {
 }
 
 
-void copy_graph(const GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
+static void copy_graph(const GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
   dstGraph->numVertices = srcGraph->numVertices;
   dstGraph->numEdges = srcGraph->numEdges;
   memcpy(dstGraph->rowPtr, srcGraph->rowPtr, (srcGraph->numVertices + 1) * sizeof(UINT_t));
   memcpy(dstGraph->colInd, srcGraph->colInd, srcGraph->numEdges * sizeof(UINT_t));
 }
 
-void allocate_graph(GRAPH_TYPE* graph) {
+static void allocate_graph(GRAPH_TYPE* graph) {
   graph->rowPtr = (UINT_t*)calloc((graph->numVertices + 1), sizeof(UINT_t));
   assert_malloc(graph->rowPtr);
   graph->colInd = (UINT_t*)calloc(graph->numEdges, sizeof(UINT_t));
   assert_malloc(graph->colInd);
 }
 
-void free_graph(GRAPH_TYPE* graph) {
+static void free_graph(GRAPH_TYPE* graph) {
     free(graph->rowPtr);
     free(graph->colInd);
     free(graph);
 }
 
-void allocate_graph_RMAT(const int scale, const int edgeFactor, GRAPH_TYPE* graph) {
+static void allocate_graph_RMAT(const int scale, const int edgeFactor, GRAPH_TYPE* graph) {
     graph->numVertices = 1 << scale;
     graph->numEdges = 2 * graph->numVertices * edgeFactor; /* Factor of 2 is to store undirected edges (a, b) and (b, a) */
 
@@ -220,7 +220,7 @@ void allocate_graph_RMAT(const int scale, const int edgeFactor, GRAPH_TYPE* grap
 }
 
 
-int compareEdge_t(const void *a, const void *b) {
+static int compareEdge_t(const void *a, const void *b) {
     edge_t arg1 = *(const edge_t *)a;
     edge_t arg2 = *(const edge_t *)b;
     if (arg1.src < arg2.src) return -1;
@@ -230,7 +230,7 @@ int compareEdge_t(const void *a, const void *b) {
     return 0;
 }
 
-int compareInt_t(const void *a, const void *b) {
+static int compareInt_t(const void *a, const void *b) {
     UINT_t arg1 = *(const UINT_t *)a;
     UINT_t arg2 = *(const UINT_t *)b;
     if (arg1 < arg2) return -1;
@@ -238,7 +238,7 @@ int compareInt_t(const void *a, const void *b) {
     return 0;
 }
 
-void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
+static void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
   UINT_t* Ap = graph->rowPtr;
@@ -282,7 +282,7 @@ void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
 
 }
 
-void create_graph_RMAT(GRAPH_TYPE* graph, const UINT_t scale) {
+static void create_graph_RMAT(GRAPH_TYPE* graph, const UINT_t scale) {
 
     register int good;
     register UINT_t src, dst;
@@ -342,7 +342,7 @@ void create_graph_RMAT(GRAPH_TYPE* graph, const UINT_t scale) {
 
 
 
-void print_graph(const GRAPH_TYPE* graph) {
+static void print_graph(const GRAPH_TYPE* graph) {
   const UINT_t* Ap = graph->rowPtr;
   const UINT_t* Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -363,7 +363,7 @@ void print_graph(const GRAPH_TYPE* graph) {
 /* Algorithm from
    T. A. Davis, "Graph algorithms via SuiteSparse: GraphBLAS: triangle counting and K-truss," 2018 IEEE High Performance extreme Computing Conference (HPEC), Waltham, MA, USA, 2018, pp. 1-6, doi: 10.1109/HPEC.2018.8547538.
 */
-UINT_t tc_davis // # of triangles
+static UINT_t tc_davis // # of triangles
 (
 #if 1
 const GRAPH_TYPE *graph
@@ -403,7 +403,7 @@ const UINT_t n // A is n-by-n
 }
  
 
-UINT_t tc_wedge(const GRAPH_TYPE *graph) {
+static UINT_t tc_wedge(const GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
   UINT_t count = 0;
 
@@ -439,7 +439,7 @@ UINT_t tc_wedge(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
   /* Direction oriented. */
   
@@ -480,7 +480,7 @@ UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
 }
 
 
-bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
+static bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
 
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
@@ -495,7 +495,7 @@ bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
 }
 
   
-UINT_t tc_triples(const GRAPH_TYPE *graph) {
+static UINT_t tc_triples(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   
   register UINT_t i, j, k;
@@ -515,7 +515,7 @@ UINT_t tc_triples(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   /* Direction oriented. */
   
@@ -539,7 +539,7 @@ UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
 
 
 
-UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
+static UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t count = 0;
@@ -569,7 +569,7 @@ UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, const UIN
   return count;
 }
 
-UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   
   register UINT_t v, w;
@@ -592,7 +592,7 @@ UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-UINT_t tc_intersectMergePath_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectMergePath_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   /* Direction oriented. */
   
@@ -617,7 +617,7 @@ UINT_t tc_intersectMergePath_DO(const GRAPH_TYPE *graph) {
   return (count/3);
 }
 
-INT_t binarySearch(const UINT_t* list, const UINT_t start, const UINT_t end, const UINT_t target) {
+static INT_t binarySearch(const UINT_t* list, const UINT_t start, const UINT_t end, const UINT_t target) {
   register INT_t s=start, e=end, mid;
   while (s < e) {
     mid = s + (e - s) / 2;
@@ -632,7 +632,7 @@ INT_t binarySearch(const UINT_t* list, const UINT_t start, const UINT_t end, con
   return -1;
 }
 
-UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
+static UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
   register UINT_t vb, ve, wb, we;
   UINT_t count=0;
 
@@ -663,7 +663,7 @@ UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v, const 
   return count;
 }
 
-UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
 
   register UINT_t v, w;
@@ -686,7 +686,7 @@ UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-UINT_t tc_intersectBinarySearch_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectBinarySearch_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
   /* Direction oriented. */
 
@@ -711,7 +711,7 @@ UINT_t tc_intersectBinarySearch_DO(const GRAPH_TYPE *graph) {
   return (count/3);
 }
 
-UINT_t binarySearch_partition(const UINT_t* list, const UINT_t start, const UINT_t end, const UINT_t target) {
+static UINT_t binarySearch_partition(const UINT_t* list, const UINT_t start, const UINT_t end, const UINT_t target) {
   register INT_t s=start, e=end, mid;
   while (s < e) {
     mid = s + (e - s) / 2;
@@ -734,7 +734,7 @@ UINT_t binarySearch_partition(const UINT_t* list, const UINT_t start, const UINT
 
 
 
-UINT_t searchLists_with_partitioning(const UINT_t* list1, const INT_t s1, const INT_t e1, const UINT_t* list2, const INT_t s2, const INT_t e2) {
+static UINT_t searchLists_with_partitioning(const UINT_t* list1, const INT_t s1, const INT_t e1, const UINT_t* list2, const INT_t s2, const INT_t e2) {
   INT_t mid1, loc2;
   UINT_t count = 0;
 
@@ -781,7 +781,7 @@ UINT_t searchLists_with_partitioning(const UINT_t* list1, const INT_t s1, const 
 }
 
 
-UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
   
   register UINT_t v, w;
@@ -804,7 +804,7 @@ UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-UINT_t tc_intersectPartition_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectPartition_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
   /* Direction oriented. */
   
@@ -830,7 +830,7 @@ UINT_t tc_intersectPartition_DO(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w) {
+static UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w) {
 
   register UINT_t vb, ve, wb, we;
   register UINT_t s1, e1, s2, e2;
@@ -868,7 +868,7 @@ UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, co
   return count;
 }
 
-UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
 
   register UINT_t v, w;
@@ -900,7 +900,7 @@ UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
+static UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
   /* Direction oriented. */
 
@@ -938,7 +938,7 @@ UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
    2017 IEEE High Performance Extreme Computing Conference (HPEC),
    Waltham, MA, USA, 2017, pp. 1-6,
    doi: 10.1109/HPEC.2017.8091046. */
-UINT_t tc_low(
+static UINT_t tc_low(
 #if 1
 			const GRAPH_TYPE *graph
 #else
@@ -1052,13 +1052,13 @@ void bfs_treelist(const GRAPH_TYPE *graph, const bool* E, UINT_t* parent /* , UI
   free(visited);
 }
 
-bool and_E(const bool* E, const UINT_t m) {
+static bool and_E(const bool* E, const UINT_t m) {
     for (UINT_t i = 0 ; i<m ; i++)
       if (E[i]) return true;
     return false;
 }
 
-bool check_edge_treelist(const GRAPH_TYPE *graph, const bool* E, const UINT_t v, const UINT_t w) {
+static bool check_edge_treelist(const GRAPH_TYPE *graph, const bool* E, const UINT_t v, const UINT_t w) {
 
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
@@ -1075,7 +1075,7 @@ bool check_edge_treelist(const GRAPH_TYPE *graph, const bool* E, const UINT_t v,
 }
 
 
-void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *parent) {
+static void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *parent) {
 
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
@@ -1106,7 +1106,7 @@ void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *parent) {
 }
 
   
-UINT_t tc_treelist(const GRAPH_TYPE *graph) {
+static UINT_t tc_treelist(const GRAPH_TYPE *graph) {
   /* Itai and Rodeh, SIAM Journal of Computing, 1978 */
   UINT_t count = 0;
   UINT_t *parent;
@@ -1173,7 +1173,7 @@ UINT_t tc_treelist(const GRAPH_TYPE *graph) {
 }
 
 
-void bfs_treelist2(const GRAPH_TYPE *graph, UINT_t* parent /* , UINT_t* component */) {
+static void bfs_treelist2(const GRAPH_TYPE *graph, UINT_t* parent /* , UINT_t* component */) {
 
   /* UINT_t c; */
   
@@ -1219,7 +1219,7 @@ void bfs_treelist2(const GRAPH_TYPE *graph, UINT_t* parent /* , UINT_t* componen
 }
 
 
-void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
+static void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
 
   UINT_t *restrict Ap = graph->rowPtr;
   UINT_t *restrict Ai = graph->colInd;
@@ -1286,7 +1286,7 @@ void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
   return;
 }
 
-UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
+static UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
   /* Itai and Rodeh, SIAM Journal of Computing, 1978 */
   UINT_t edges;
   UINT_t count = 0;
@@ -1361,7 +1361,7 @@ UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+static UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t count = 0;
@@ -1390,7 +1390,7 @@ UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, c
   return count;
 }
 
-UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+static UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
 
   register UINT_t vb, ve, wb, we;
   register UINT_t s1, e1, s2, e2;
@@ -1428,7 +1428,7 @@ UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT
 }
 
 
-UINT_t tc_forward(const GRAPH_TYPE *graph) {
+static UINT_t tc_forward(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1466,7 +1466,7 @@ UINT_t tc_forward(const GRAPH_TYPE *graph) {
   return count;
 }
 
-UINT_t tc_forward_hash_config_size(const GRAPH_TYPE *graph, UINT_t hashSize) {
+static UINT_t tc_forward_hash_config_size(const GRAPH_TYPE *graph, UINT_t hashSize) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1508,7 +1508,7 @@ UINT_t tc_forward_hash_config_size(const GRAPH_TYPE *graph, UINT_t hashSize) {
   return count;
 }
 
-UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
+static UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   return tc_forward_hash_config_size(graph, 0);
 }
 
@@ -1517,7 +1517,7 @@ typedef struct {
   UINT_t index;
 } vertexDegree_t;
 
-int compareVertexDegree_t(const void *a, const void *b) {
+static int compareVertexDegree_t(const void *a, const void *b) {
     vertexDegree_t v1 = *(const vertexDegree_t *)a;
     vertexDegree_t v2 = *(const vertexDegree_t *)b;
     if (v1.degree > v2.degree) return -1;
@@ -1527,7 +1527,7 @@ int compareVertexDegree_t(const void *a, const void *b) {
     return 0;
 }
 
-GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
+static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
   
   register UINT_t s;
   register UINT_t b, e;
@@ -1596,7 +1596,7 @@ GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
   return graph2;
 }
 
-UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
+static UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1616,7 +1616,7 @@ UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 #define EMPTY ((UINT_t) (-1))
 
 // Function to create a new queue
-Queue *createQueue(UINT_t size) {
+static Queue *createQueue(UINT_t size) {
   Queue *queue = (Queue *)malloc(sizeof(Queue));
   assert_malloc(queue);
   queue->items = (UINT_t *)malloc(size * sizeof(UINT_t));
@@ -1627,23 +1627,23 @@ Queue *createQueue(UINT_t size) {
   return queue;
 }
 
-void free_queue(Queue *queue) {
+static void free_queue(Queue *queue) {
   free(queue->items);
   free(queue);
 }
 
 // Function to check if the queue is empty
-int isEmpty(Queue *queue) {
+static int isEmpty(Queue *queue) {
   return queue->rear == EMPTY;
 }
 
 // Function to check if the queue is full
-int isFull(Queue *queue) {
+static int isFull(Queue *queue) {
   return queue->rear == queue->size - 1;
 }
 
 // Function to add an element to the queue
-void enqueue(Queue *queue, UINT_t value) {
+static void enqueue(Queue *queue, UINT_t value) {
   if (isFull(queue))
     fprintf(stderr,"Queue is full.\n");
   else {
@@ -1659,7 +1659,7 @@ void enqueue(Queue *queue, UINT_t value) {
 }
 
 // Function to remove an element from the queue
-UINT_t dequeue(Queue *queue) {
+static UINT_t dequeue(Queue *queue) {
   UINT_t item;
   if (isEmpty(queue)) {
     printf("Queue is empty.\n");
@@ -1674,7 +1674,7 @@ UINT_t dequeue(Queue *queue) {
 }
 
 // Function to perform breadth-first search
-void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
+static void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
   bool *visited = (bool *)calloc(graph->numVertices, sizeof(bool));
   assert_malloc(visited);
 
@@ -1700,7 +1700,7 @@ void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
   free_queue(queue);
 }
 
-void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited) {
+static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
@@ -1721,7 +1721,7 @@ void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level
   }
 }
 
-void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited, bool* horiz) {
+static void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited, bool* horiz) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
@@ -1747,7 +1747,7 @@ void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex
 }
 
 
-void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w, UINT_t* c1, UINT_t* c2) {
+static void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w, UINT_t* c1, UINT_t* c2) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t level_v;
@@ -1780,7 +1780,7 @@ void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, 
 }
 
 
-double tc_bader_compute_k(const GRAPH_TYPE *graph) {
+static double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* level;
   UINT_t s, e, l, w;
@@ -1821,7 +1821,7 @@ double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   return (2.0 * (double)k/(double)graph->numEdges);
 }
 
-UINT_t tc_bader(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* level;
   UINT_t s, e, l, w;
@@ -1859,7 +1859,7 @@ UINT_t tc_bader(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_bader3(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -1926,7 +1926,7 @@ UINT_t tc_bader3(const GRAPH_TYPE *graph) {
 
 
 
-UINT_t tc_bader4(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2000,7 +2000,7 @@ UINT_t tc_bader4(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2012,7 +2012,7 @@ UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_bader5(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2086,7 +2086,7 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w) {
+static UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t vlist, wlist, level_v;
@@ -2127,11 +2127,11 @@ UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* leve
 
 
 #if 1
-UINT_t k;
+static UINT_t k;
 #endif
 
 
-UINT_t tc_bader2(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t* level;
@@ -2175,7 +2175,7 @@ UINT_t tc_bader2(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
+static UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t* level;
@@ -2196,7 +2196,7 @@ UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
   return level;
 }
 
-UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* level) {
+static UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* level) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t s, e, l, w;
@@ -2225,7 +2225,7 @@ UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* level) {
 
 
 
-void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
+static void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
   int loop, err;
   double 
     total_time,
@@ -2265,7 +2265,7 @@ void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t scale, c
 }
 
 
-UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2389,7 +2389,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2406,7 +2406,7 @@ UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 
 
 
-void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
+static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
   int loop, err;
   double 
     total_time,
@@ -2438,7 +2438,7 @@ void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph
 
 }
 
-void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
+static void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   FILE *infile = fopen(filename, "r");
   if (infile == NULL) {
     printf("Error opening file %s.\n", filename);
