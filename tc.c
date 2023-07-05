@@ -2296,7 +2296,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
-  Hash = (bool *)calloc(m, sizeof(bool));
+  Hash = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Hash);
 
   horiz = (bool *)malloc(m * sizeof(bool));
