@@ -1700,7 +1700,7 @@ static void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level
   free_queue(queue);
 }
 
-static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited) {
+static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
@@ -1721,7 +1721,7 @@ static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t
   }
 }
 
-static void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, Queue* queue, bool* visited, bool* horiz) {
+static void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited, bool* horiz) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
 
@@ -1747,7 +1747,7 @@ static void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t star
 }
 
 
-static void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w, UINT_t* c1, UINT_t* c2) {
+static void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w, UINT_t* restrict c1, UINT_t* restrict c2) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t level_v;
@@ -1782,7 +1782,7 @@ static void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* 
 
 static double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t s, e, l, w;
   UINT_t c1, c2;
   UINT_t NO_LEVEL;
@@ -1823,7 +1823,7 @@ static double tc_bader_compute_k(const GRAPH_TYPE *graph) {
 
 static UINT_t tc_bader(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t s, e, l, w;
   UINT_t c1, c2;
   UINT_t NO_LEVEL;
@@ -1864,7 +1864,7 @@ static UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t c1, c2;
   register UINT_t x;
   bool* Hash;
@@ -1932,7 +1932,7 @@ static UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
   /* Mark horizontal edges during BFS */
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t c1, c2;
   register UINT_t x;
   bool *Hash;
@@ -2019,7 +2019,7 @@ static UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   /* Mark horizontal edges during BFS */
   /* Use directionality to only use one counter for triangles where v < w < x */
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t count;
   register UINT_t x;
   bool *Hash;
@@ -2086,7 +2086,7 @@ static UINT_t tc_bader5(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* level, const UINT_t v, const UINT_t w) {
+static UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* restrict level, const UINT_t v, const UINT_t w) {
   register UINT_t vb, ve, wb, we;
   register UINT_t ptr_v, ptr_w;
   UINT_t vlist, wlist, level_v;
@@ -2134,7 +2134,7 @@ static UINT_t k;
 static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t s, e, l, w;
   UINT_t count = 0;
   UINT_t NO_LEVEL;
@@ -2178,7 +2178,7 @@ static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
 static UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
-  UINT_t* level;
+  UINT_t* restrict level;
   UINT_t NO_LEVEL;
 
   level = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
@@ -2196,7 +2196,7 @@ static UINT_t* tc_bader2_bfs(const GRAPH_TYPE *graph) {
   return level;
 }
 
-static UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* level) {
+static UINT_t tc_bader2_tc(const GRAPH_TYPE *graph, UINT_t* restrict level) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t s, e, l, w;
@@ -2231,7 +2231,7 @@ static void runTC_bader2(UINT_t (*f)(const GRAPH_TYPE*, UINT_t*), const UINT_t s
     total_time,
     over_time;
   UINT_t numTriangles;
-  UINT_t* level;
+  UINT_t* restrict level;
 
   level = tc_bader2_bfs(originalGraph);
   
