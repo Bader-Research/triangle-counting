@@ -1613,7 +1613,7 @@ UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t EMPTY;
+#define EMPTY ((UINT_t) (-1))
 
 // Function to create a new queue
 Queue *createQueue(UINT_t size) {
@@ -1621,7 +1621,6 @@ Queue *createQueue(UINT_t size) {
   assert_malloc(queue);
   queue->items = (UINT_t *)malloc(size * sizeof(UINT_t));
   assert_malloc(queue->items);
-  EMPTY = size;
   queue->front = EMPTY;
   queue->rear = EMPTY;
   queue->size = size;
