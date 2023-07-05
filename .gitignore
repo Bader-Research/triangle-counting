@@ -4,3 +4,4 @@ core
 tc
 tcO*
 *.mtx
+gmon.out
