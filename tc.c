@@ -2441,6 +2441,7 @@ void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph
 	  INFILENAME,
 	  graph->numVertices, (graph->numEdges)/2,
 	  name, total_time, numTriangles);
+  fflush(outfile);
 
 }
 
