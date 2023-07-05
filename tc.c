@@ -105,6 +105,7 @@ static int QUIET;
 static int SCALE = 0;
 static int PRINT = 0;
 static int NCUBED = 1;
+static bool input_selected = 0;
 
 static void usage(void) {
 
@@ -112,7 +113,7 @@ static void usage(void) {
   printf("Usage:\n\n");
   printf("Either one of these two must be selected:\n");
   printf(" -f <filename>   [Input Graph in Matrix Market format]\n");
-  printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= 5) \n");
+  printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= %d) \n", SCALE_MIN);
   printf("Optional arguments:\n");
   printf(" -o <filename>   [Output File]\n");
   printf(" -p              [Print Input Graph]\n");
@@ -137,6 +138,7 @@ static void parseFlags(int argc, char **argv) {
       infile = fopen(argv[2], "r");
       if (infile == NULL) usage();
       INFILENAME = argv[2];
+      input_selected = true;
       argv+=2;
       argc-=2;
       break;
@@ -155,6 +157,7 @@ static void parseFlags(int argc, char **argv) {
       if (!QUIET)
 	printf("RMAT Scale: %d\n",SCALE);
       INFILENAME = "RMAT";
+      if (SCALE >= SCALE_MIN) input_selected = true;
       argv+=2;
       argc-=2;
       break;
@@ -184,7 +187,7 @@ static void parseFlags(int argc, char **argv) {
 
   }
 
-  if ((INFILENAME == NULL) && (SCALE <= 5)) usage();
+  if (!input_selected) usage();
   
   return;
 }
@@ -2554,7 +2557,7 @@ main(int argc, char **argv) {
   assert_malloc(graph);
 
 
-  if (SCALE > 5) {
+  if (SCALE) {
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, originalGraph);
     create_graph_RMAT(originalGraph, SCALE);
     allocate_graph_RMAT(SCALE, EDGE_FACTOR, graph);
