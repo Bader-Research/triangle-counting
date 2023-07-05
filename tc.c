@@ -23,11 +23,16 @@
 #define INLINE
 #endif
 
-#define UINT_t uint32_t
-#define INT_t int32_t
 #ifdef ICX
 #define UINT_t uint
 #define INT_t int
+#endif
+
+#ifndef UINT_t
+#define UINT_t uint32_t
+#endif
+#ifndef INT_t
+#define INT_t int32_t
 #endif
 
 

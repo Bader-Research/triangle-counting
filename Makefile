@@ -1,6 +1,6 @@
 
 # build options
-OPTS = -DLOOP_CNT=1
+#OPTS = -DLOOP_CNT=1
 
 # GCC
 CC 	= gcc
