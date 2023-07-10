@@ -57,7 +57,8 @@ static void free_graph(GRAPH_TYPE*);
 static void allocate_graph_RMAT(const int, const int, GRAPH_TYPE*);
 static void create_graph_RMAT(GRAPH_TYPE*, const UINT_t);
 static bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
-static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *);
+enum reorderDegree_t { REORDER_HIGHEST_DEGREE_FIRST = 0, REORDER_LOWEST_DEGREE_FIRST };
+static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *, enum reorderDegree_t reorderDegree);
 
 static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
 
@@ -869,7 +870,7 @@ static UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_
 
   for (UINT_t i= s2; i<e2 ; i++)
     if (Hash[Ai[i]]) count++;
-  
+
   for (UINT_t i=s1 ; i<e1 ; i++)
     Hash[Ai[i]] = false;
 
@@ -1403,7 +1404,7 @@ static UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, con
   register UINT_t vb, ve, wb, we;
   register UINT_t s1, e1, s2, e2;
   UINT_t count = 0;
-  
+
   const UINT_t* restrict Ap = graph->rowPtr;
 
   vb = Ap[v  ];
@@ -1432,6 +1433,40 @@ static UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, con
   for (UINT_t i=s1 ; i<e1 ; i++)
     Hash[A[i]] = false;
     
+  return count;
+}
+
+
+static UINT_t intersectSizeHashSkip_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+
+  register UINT_t s1, e1, s2, e2;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+
+  if (Size[v] < Size[w]) {
+    if (Size[v] == 0) return 0;
+    s1 = Ap[v  ];
+    e1 = s1 + Size[v];
+    s2 = Ap[w  ];
+    e2 = s2 + Size[w];
+  } else {
+    if (Size[w] == 0) return 0;
+    s1 = Ap[w  ];
+    e1 = s1 + Size[w];
+    s2 = Ap[v  ];
+    e2 = s2 + Size[v];
+  }
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = true;
+
+  for (UINT_t i=s2 ; i<e2 ; i++)
+    if (Hash[A[i]]) count++;
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = false;
+
   return count;
 }
 
@@ -1520,6 +1555,52 @@ static UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   return tc_forward_hash_config_size(graph, 0);
 }
 
+static UINT_t tc_forward_hash_skip_config_size(const GRAPH_TYPE *graph, UINT_t hashSize) {
+
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
+
+  register UINT_t s, t;
+  register UINT_t b, e;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  bool* Hash = (bool *)calloc( (hashSize == 0)? m: hashSize, sizeof(bool));
+  assert_malloc(Hash);
+
+  UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(Size);
+
+  UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
+  assert_malloc(A);
+
+  for (s = 0 ; s < n ; s++) {
+    b = Ap[s  ];
+    e = Ap[s+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      t  = Ai[i];
+      if (s<t) {
+	count += intersectSizeHashSkip_forward(graph, Hash, s, t, A, Size);
+	A[Ap[t] + Size[t]] = s;
+	Size[t]++;
+      }
+    }
+  }
+
+  free(A);
+  free(Size);
+  free(Hash);
+
+  return count;
+}
+
+static UINT_t tc_forward_hash_skip(const GRAPH_TYPE *graph) {
+  return tc_forward_hash_skip_config_size(graph, 0);
+}
+
 typedef struct {
   UINT_t degree;
   UINT_t index;
@@ -1535,7 +1616,17 @@ static int compareVertexDegree_t(const void *a, const void *b) {
     return 0;
 }
 
-static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
+static int compareVertexDegreeLowestFirst_t(const void *a, const void *b) {
+    vertexDegree_t v1 = *(const vertexDegree_t *)a;
+    vertexDegree_t v2 = *(const vertexDegree_t *)b;
+    if (v1.degree < v2.degree) return -1;
+    if (v1.degree > v2.degree) return 1;
+    if (v1.index < v2.index) return -1;
+    if (v1.index > v2.index) return 1;
+    return 0;
+}
+
+static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph, enum reorderDegree_t reorderDegree) {
   
   register UINT_t s;
   register UINT_t b, e;
@@ -1562,7 +1653,7 @@ static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph) {
     Perm[i].index  = i;
   }
 
-  qsort(Perm, n, sizeof(vertexDegree_t), compareVertexDegree_t);
+  qsort(Perm, n, sizeof(vertexDegree_t), ((reorderDegree == REORDER_HIGHEST_DEGREE_FIRST)? compareVertexDegree_t: compareVertexDegreeLowestFirst_t));
 
   GRAPH_TYPE *graph2;
   graph2 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
@@ -1611,12 +1702,29 @@ static UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   UINT_t count = 0;
 
   GRAPH_TYPE *graph2;
-  graph2 = reorder_graph_by_degree(graph);
+  graph2 = reorder_graph_by_degree(graph, REORDER_HIGHEST_DEGREE_FIRST);
 
   count = tc_forward_hash(graph2);
 
   free_graph(graph2);
   
+  return count;
+}
+
+
+static UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
+
+/* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
+
+  UINT_t count = 0;
+
+  GRAPH_TYPE *graph2;
+  graph2 = reorder_graph_by_degree(graph, REORDER_LOWEST_DEGREE_FIRST);
+
+  count = tc_forward_hash(graph2);
+
+  free_graph(graph2);
+
   return count;
 }
 
@@ -2015,7 +2123,7 @@ static UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
   /* Mark horizontal edges during BFS */
   /* Direction orientied. */
 
-  GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph);
+  GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph, REORDER_HIGHEST_DEGREE_FIRST);
   return tc_bader4(graph2);
 }
 
@@ -2303,7 +2411,7 @@ static UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
 
 
-  GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph);
+  GRAPH_TYPE *graph2 = reorder_graph_by_degree(graph, REORDER_HIGHEST_DEGREE_FIRST);
   UINT_t count = tc_bader_forward_hash(graph2);
   free_graph(graph2);
   return count;
@@ -2474,7 +2582,7 @@ main(int argc, char **argv) {
   }
 
   if (!QUIET)
-    fprintf(outfile,"Graph has %d vertices and %d undirected edges.\n",originalGraph->numVertices,originalGraph->numEdges/2);
+    fprintf(outfile,"Graph has %d vertices and %d undirected edges. Timing loop count %d.\n", originalGraph->numVertices, originalGraph->numEdges/2, LOOP_CNT);
 
   if (PRINT)
     print_graph(originalGraph);
@@ -2498,7 +2606,9 @@ main(int argc, char **argv) {
   benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
   benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
   benchmarkTC(tc_forward_hash, originalGraph, graph, "tc_forward_hash");
+  benchmarkTC(tc_forward_hash_skip, originalGraph, graph, "tc_forward_hash_skip");
   benchmarkTC(tc_forward_hash_degreeOrder, originalGraph, graph, "tc_forward_hash_degreeOrder");
+  benchmarkTC(tc_forward_hash_degreeOrderReverse, originalGraph, graph, "tc_forward_hash_degreeOrderRev");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
