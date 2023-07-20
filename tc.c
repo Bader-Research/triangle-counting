@@ -3,10 +3,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
-#include <sys/time.h>
 #include <limits.h>
 #include <strings.h>
 #include <stdbool.h>
+#include "types.h"
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
@@ -23,30 +23,7 @@
 #define INLINE
 #endif
 
-#ifdef ICX
-#define UINT_t uint
-#define INT_t int
-#endif
 
-#ifndef UINT_t
-#define UINT_t uint32_t
-#endif
-#ifndef INT_t
-#define INT_t int32_t
-#endif
-
-
-typedef struct {
-    UINT_t numVertices;
-    UINT_t numEdges;
-    UINT_t* rowPtr;
-    UINT_t* colInd;
-} GRAPH_TYPE;
-
-typedef struct {
-  UINT_t src;
-  UINT_t dst;
-} edge_t;
 
 static void print_graph(const GRAPH_TYPE*);
 static void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
@@ -81,31 +58,9 @@ static UINT_t dequeue(Queue *);
 static void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
 static void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
 
-
-#define ODD(n) ((n)&1)==1
-#define max(a,b) ((a)>(b)?(a):(b))
-#define min(a,b) ((a)<(b)?(a):(b))
-
-struct timeval  tp;
-struct timezone tzp;
-
-#define get_seconds()   (gettimeofday(&tp, &tzp), \
-                        (double)tp.tv_sec + (double)tp.tv_usec / 1000000.0)
-
-
-static void assert_malloc(const void *ptr) {
-    if (ptr==NULL) {
-	fprintf(stderr,"ERROR: Null pointer\n");
-	exit(1);
-    }
-}
-
 static FILE *infile = NULL, *outfile = NULL;
 static char *INFILENAME = NULL;
-static int QUIET;
 static int SCALE = 0;
-static int PRINT = 0;
-static int NCUBED = 1;
 static bool input_selected = 0;
 
 static void usage(void) {
@@ -117,7 +72,11 @@ static void usage(void) {
   printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= %d) \n", SCALE_MIN);
   printf("Optional arguments:\n");
   printf(" -o <filename>   [Output File]\n");
-  printf(" -p              [Print Input Graph]\n");
+#ifdef PARALLEL
+  printf(" -p #            [Parallel: Use # threads/cores]\n");
+  printf(" -P              [Parallel: Use maximum number of cores]\n");
+#endif
+  printf(" -d              [Display/Print Input Graph]\n");
   printf(" -q              [Turn on Quiet mode]\n");
   printf(" -x              [Do not run N^3 algorithms]\n");
   exit (8);
@@ -169,11 +128,25 @@ static void parseFlags(int argc, char **argv) {
       argc--;
       break;
 	
-    case 'p':
+    case 'd':
       PRINT = 1;
       argv++;
       argc--;
       break;
+	
+#ifdef PARALLEL
+    case 'P':
+      PARALLEL_MAX = true;
+      argv++;
+      argc--;
+      break;
+      
+    case 'p':
+      PARALLEL_PROCS = atoi(argv[2]);
+      argv+=2;
+      argc-=2;
+      break;
+#endif
 	
     case 'x':
       NCUBED = 0;
@@ -889,7 +862,6 @@ static UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
   const UINT_t* restrict Ap = graph->rowPtr;
   const UINT_t* restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
-  const UINT_t m = graph->numEdges;
 
   Hash = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Hash);

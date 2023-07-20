@@ -2,33 +2,39 @@
 # build options
 #OPTS = -DLOOP_CNT=1
 
+# Turn off/on OpenMP parallel code
+#PARALLEL = 
+PARALLEL = -DPARALLEL
+
 # GCC
 CC 	= gcc
-CFLAGS1 = -DGCC -Wall
-CFLAGS2 = -DGCC -Wall -funroll-loops -funroll-all-loops -O2
-CFLAGS3 = -DGCC -Wall -funroll-loops -funroll-all-loops -O3
+CFLAGS1 = -DGCC $(PARALLEL) -Wall
+CFLAGS2 = -DGCC $(PARALLEL) -Wall -funroll-loops -funroll-all-loops -O2
+CFLAGS3 = -DGCC $(PARALLEL) -Wall -funroll-loops -funroll-all-loops -O3
 
 # Intel ICX
 #CC      = icx
-#CFLAGS1 = -DICX -Wall
-#CFLAGS2 = -DICX -Wall -O2
-#CFLAGS3 = -DICX -Wall -O3
+#CFLAGS1 = -DICX -DPARALLEL -Wall
+#CFLAGS2 = -DICX -DPARALLEL -Wall -O2
+#CFLAGS3 = -DICX -DPARALLEL -Wall -O3
+
+OBJS = tc.o tc_parallel.o
 
 #all: tc tcO2 tcO3
 all: tcO2
 
-tc: tc.c
-	${CC} ${CFLAGS} ${CFLAGS1} ${OPTS} -o tc tc.c -lm
+%.o: %.c
+	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -c $< -o $@
 
-tcO2: tc.c
-	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -o tcO2 tc.c -lm
+tc: $(OBJS)
+	${CC} ${CFLAGS} ${CFLAGS1} ${OPTS} -o $@ $(OBJS) -lm
 
-tcO3: tc.c
-	${CC} ${CFLAGS} ${CFLAGS3} ${OPTS} -o tcO3 tc.c -lm
+tcO2: $(OBJS)
+	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -o $@ $(OBJS) -lm
 
-testO2: tcO2 roadNet-PA.mtx
-	./tcO2 -f roadNet-PA.mtx -x
+tcO3: $(OBJS)
+	${CC} ${CFLAGS} ${CFLAGS3} ${OPTS} -o $@ $(OBJS) -lm
 
 clean: 
-	rm -f core *~ \
+	rm -f core *~ $(OBJS) \
 	tc tcO2 tcO3
