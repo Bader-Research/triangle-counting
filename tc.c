@@ -1,12 +1,6 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <math.h>
-#include <limits.h>
-#include <strings.h>
-#include <stdbool.h>
 #include "types.h"
+#include "queue.h"
+#include "graph.h"
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
@@ -24,36 +18,9 @@
 #endif
 
 
-
-static void print_graph(const GRAPH_TYPE*);
-static void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
-static void copy_graph(const GRAPH_TYPE *, GRAPH_TYPE *);
-static bool check_triangleCount(const GRAPH_TYPE *, const UINT_t);
-static void allocate_graph(GRAPH_TYPE*);
-static void free_graph(GRAPH_TYPE*);
-static void allocate_graph_RMAT(const int, const int, GRAPH_TYPE*);
-static void create_graph_RMAT(GRAPH_TYPE*, const UINT_t);
-static bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
-enum reorderDegree_t { REORDER_HIGHEST_DEGREE_FIRST = 0, REORDER_LOWEST_DEGREE_FIRST };
-static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *, enum reorderDegree_t reorderDegree);
-
 static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
 
 static double tc_bader_compute_k(const GRAPH_TYPE *);
-
-typedef struct {
-  UINT_t *items;
-  UINT_t front;
-  UINT_t rear;
-  UINT_t size;
-} Queue;
-
-static Queue *createQueue(UINT_t);
-static void free_queue(Queue *);
-static int isEmpty(Queue *);
-static int isFull(Queue *);
-static void enqueue(Queue *, UINT_t);
-static UINT_t dequeue(Queue *);
 
 static void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
 static void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
@@ -173,174 +140,6 @@ bool check_triangleCount(const GRAPH_TYPE *graph, const UINT_t numTriangles) {
   return (numTriangles==correctTriangleCount);
 }
 
-
-static void copy_graph(const GRAPH_TYPE *srcGraph, GRAPH_TYPE *dstGraph) {
-  dstGraph->numVertices = srcGraph->numVertices;
-  dstGraph->numEdges = srcGraph->numEdges;
-  memcpy(dstGraph->rowPtr, srcGraph->rowPtr, (srcGraph->numVertices + 1) * sizeof(UINT_t));
-  memcpy(dstGraph->colInd, srcGraph->colInd, srcGraph->numEdges * sizeof(UINT_t));
-}
-
-static void allocate_graph(GRAPH_TYPE* graph) {
-  graph->rowPtr = (UINT_t*)calloc((graph->numVertices + 1), sizeof(UINT_t));
-  assert_malloc(graph->rowPtr);
-  graph->colInd = (UINT_t*)calloc(graph->numEdges, sizeof(UINT_t));
-  assert_malloc(graph->colInd);
-}
-
-static void free_graph(GRAPH_TYPE* graph) {
-    free(graph->rowPtr);
-    free(graph->colInd);
-    free(graph);
-}
-
-static void allocate_graph_RMAT(const int scale, const int edgeFactor, GRAPH_TYPE* graph) {
-    graph->numVertices = 1 << scale;
-    graph->numEdges = 2 * graph->numVertices * edgeFactor; /* Factor of 2 is to store undirected edges (a, b) and (b, a) */
-
-    allocate_graph(graph);
-}
-
-
-static int compareEdge_t(const void *a, const void *b) {
-    edge_t arg1 = *(const edge_t *)a;
-    edge_t arg2 = *(const edge_t *)b;
-    if (arg1.src < arg2.src) return -1;
-    if (arg1.src > arg2.src) return 1;
-    if ((arg1.src == arg2.src) && (arg1.dst < arg2.dst)) return -1;
-    if ((arg1.src == arg2.src) && (arg1.dst > arg2.dst)) return 1;
-    return 0;
-}
-
-static int compareInt_t(const void *a, const void *b) {
-    UINT_t arg1 = *(const UINT_t *)a;
-    UINT_t arg2 = *(const UINT_t *)b;
-    if (arg1 < arg2) return -1;
-    if (arg1 > arg2) return 1;
-    return 0;
-}
-
-static void convert_edges_to_graph(const edge_t* edges, GRAPH_TYPE* graph) {
-  const UINT_t n = graph->numVertices;
-  const UINT_t m = graph->numEdges;
-  UINT_t* Ap = graph->rowPtr;
-  UINT_t* Ai = graph->colInd;
-
-  for (UINT_t i = 0 ; i < n + 1 ; i++)
-    Ap[i] = 0;
-
-  // Count the number of edges incident to each vertex
-  for (UINT_t i = 0; i < m; i++) {
-    UINT_t vertex = edges[i].src;
-    Ap[vertex + 1]++;
-  }
-
-  // Compute the prefix sum of the rowPtr array
-  for (UINT_t i = 1; i <= n; i++) {
-    Ap[i] += Ap[i - 1];
-  }
-
-  // Populate the col_idx array with the destination vertices
-  UINT_t *current_row = (UINT_t *)calloc(n, sizeof(UINT_t));
-  assert_malloc(current_row);
-  for (UINT_t i = 0; i < m; i++) {
-    UINT_t src_vertex = edges[i].src;
-    UINT_t dst_vertex = edges[i].dst;
-    UINT_t index = Ap[src_vertex] + current_row[src_vertex];
-    Ai[index] = dst_vertex;
-    current_row[src_vertex]++;
-  }
-
-  // Sort the column indices within each row
-  for (UINT_t i = 0; i < graph->numVertices; i++) {
-    UINT_t s = Ap[i];
-    UINT_t e = Ap[i + 1];
-    UINT_t size = e - s;
-    UINT_t *row_indices = &Ai[s];
-    qsort(row_indices, size, sizeof(UINT_t), compareInt_t);
-  }
-
-  free(current_row);
-
-}
-
-static void create_graph_RMAT(GRAPH_TYPE* graph, const UINT_t scale) {
-
-    register int good;
-    register UINT_t src, dst;
-
-    edge_t* edges = (edge_t*)calloc(graph->numEdges, sizeof(edge_t));
-    assert_malloc(edges);
-
-    UINT_t e_start = 0;
-
-    for (UINT_t e = e_start ; e < graph->numEdges ; e+=2) {
-
-      good = 0;
-
-      while (!good) {
-	src = 0;
-	dst = 0;
-
-	for (UINT_t level = 0; level < scale; level++) {
-	  double randNum = (double)rand() / RAND_MAX;
-
-	  double a = 0.57, b = 0.19, c = 0.19; /* d = 1 - a - b - c */
-
-	  if (randNum < a)
-	    continue;
-	  else if (randNum < a + b)
-	    dst |= 1 << level;
-	  else if (randNum < a + b + c)
-	    src |= 1 << level;
-	  else {
-	    src |= 1 << level;
-	    dst |= 1 << level;
-	  }
-	}
-
-	good = 1;
-
-	/* Only keep unique edges */
-	for (UINT_t i = 0; i<e ; i++)
-	  if ((edges[i].src == src) && (edges[i].dst == dst)) good = 0;
-	/* Do not keep self-loops */
-	if (src == dst) good = 0;
-      }
-
-      edges[e  ].src = src;
-      edges[e  ].dst = dst;
-      edges[e+1].src = dst;
-      edges[e+1].dst = src;
-#if DEBUG
-      fprintf(stdout,"Edge[%5d]: (%5d, %5d)\n",e, edges[e].src, edges[e].dst);
-#endif
-    }
-
-    convert_edges_to_graph(edges,graph);
-
-    free(edges);
-}
-
-
-
-static void print_graph(const GRAPH_TYPE* graph) {
-  const UINT_t* Ap = graph->rowPtr;
-  const UINT_t* Ai = graph->colInd;
-  const UINT_t n = graph->numVertices;
-  const UINT_t m = graph->numEdges;
-  
-  fprintf(outfile,"Number of Vertices: %u\n", n);
-  fprintf(outfile,"Number of Edges: %u\n", m);
-  fprintf(outfile,"RowPtr: ");
-  for (UINT_t i = 0; i <= n; i++)
-    fprintf(outfile,"%u ", Ap[i]);
-  fprintf(outfile,"\n");
-  fprintf(outfile,"ColInd: ");
-  for (UINT_t i = 0; i < m; i++)
-    fprintf(outfile,"%u ", Ai[i]);
-  fprintf(outfile,"\n");
-}
 
 /* Algorithm from
    T. A. Davis, "Graph algorithms via SuiteSparse: GraphBLAS: triangle counting and K-truss," 2018 IEEE High Performance extreme Computing Conference (HPEC), Waltham, MA, USA, 2018, pp. 1-6, doi: 10.1109/HPEC.2018.8547538.
@@ -462,21 +261,6 @@ static UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
 }
 
 
-static bool check_edge(const GRAPH_TYPE *graph, const UINT_t v, const UINT_t w) {
-
-  const UINT_t* restrict Ap = graph->rowPtr;
-  const UINT_t* restrict Ai = graph->colInd;
-
-  UINT_t s = Ap[v];
-  UINT_t e = Ap[v+1];
-  for (UINT_t i = s; i < e; i++)
-    if (Ai[i] == w)
-      return true;
-
-  return false;
-}
-
-  
 static UINT_t tc_triples(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   
@@ -1573,100 +1357,6 @@ static UINT_t tc_forward_hash_skip(const GRAPH_TYPE *graph) {
   return tc_forward_hash_skip_config_size(graph, 0);
 }
 
-typedef struct {
-  UINT_t degree;
-  UINT_t index;
-} vertexDegree_t;
-
-static int compareVertexDegree_t(const void *a, const void *b) {
-    vertexDegree_t v1 = *(const vertexDegree_t *)a;
-    vertexDegree_t v2 = *(const vertexDegree_t *)b;
-    if (v1.degree > v2.degree) return -1;
-    if (v1.degree < v2.degree) return 1;
-    if (v1.index < v2.index) return -1;
-    if (v1.index > v2.index) return 1;
-    return 0;
-}
-
-static int compareVertexDegreeLowestFirst_t(const void *a, const void *b) {
-    vertexDegree_t v1 = *(const vertexDegree_t *)a;
-    vertexDegree_t v2 = *(const vertexDegree_t *)b;
-    if (v1.degree < v2.degree) return -1;
-    if (v1.degree > v2.degree) return 1;
-    if (v1.index < v2.index) return -1;
-    if (v1.index > v2.index) return 1;
-    return 0;
-}
-
-static GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *graph, enum reorderDegree_t reorderDegree) {
-  
-  register UINT_t s;
-  register UINT_t b, e;
-
-  const UINT_t* restrict Ap = graph->rowPtr;
-  const UINT_t* restrict Ai = graph->colInd;
-  const UINT_t n = graph->numVertices;
-  const UINT_t m = graph->numEdges;
-
-  bool* Hash = (bool *)calloc(m, sizeof(bool));
-  assert_malloc(Hash);
-
-  UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
-  assert_malloc(Size);
-  
-  UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
-  assert_malloc(A);
-
-  vertexDegree_t* Perm = (vertexDegree_t *)malloc(n * sizeof(vertexDegree_t));
-  assert_malloc(Perm);
-  
-  for (UINT_t i=0; i<n ; i++) {
-    Perm[i].degree = Ap[i+1] - Ap[i];
-    Perm[i].index  = i;
-  }
-
-  qsort(Perm, n, sizeof(vertexDegree_t), ((reorderDegree == REORDER_HIGHEST_DEGREE_FIRST)? compareVertexDegree_t: compareVertexDegreeLowestFirst_t));
-
-  GRAPH_TYPE *graph2;
-  graph2 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(graph2);
-
-  graph2->numVertices = n;
-  graph2->numEdges = m;
-  allocate_graph(graph2);
-  UINT_t* restrict Ap2 = graph2->rowPtr;
-  UINT_t* restrict Ai2 = graph2->colInd;
-
-  Ap2[0] = 0;
-  for (UINT_t i=1 ; i<=n ; i++)
-    Ap2[i] = Ap2[i-1] + Perm[i-1].degree;
-
-  UINT_t *reverse = (UINT_t *)malloc(n*sizeof(UINT_t));
-  assert_malloc(reverse);
-
-  for (UINT_t i=0 ; i<n ; i++)
-    reverse[Perm[i].index] = i;
-
-  for (s = 0; s < n ; s++) {
-    UINT_t ps = Perm[s].index;
-    b = Ap[ps];
-    e = Ap[ps+1];
-    UINT_t d = 0;
-    for (UINT_t i=b ; i<e ; i++) {
-      Ai2[Ap2[s] + d] = reverse[Ai[i]];
-      d++;
-    }
-  }
-
-  free(reverse);
-  free(Perm);
-  free(A);
-  free(Size);
-  free(Hash);
-  
-  return graph2;
-}
-
 static UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
@@ -1700,66 +1390,6 @@ static UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
   return count;
 }
 
-
-#define EMPTY ((UINT_t) (-1))
-
-// Function to create a new queue
-static Queue *createQueue(UINT_t size) {
-  Queue *queue = (Queue *)malloc(sizeof(Queue));
-  assert_malloc(queue);
-  queue->items = (UINT_t *)malloc(size * sizeof(UINT_t));
-  assert_malloc(queue->items);
-  queue->front = EMPTY;
-  queue->rear = EMPTY;
-  queue->size = size;
-  return queue;
-}
-
-static void free_queue(Queue *queue) {
-  free(queue->items);
-  free(queue);
-}
-
-// Function to check if the queue is empty
-static int isEmpty(Queue *queue) {
-  return queue->rear == EMPTY;
-}
-
-// Function to check if the queue is full
-static int isFull(Queue *queue) {
-  return queue->rear == queue->size - 1;
-}
-
-// Function to add an element to the queue
-static void enqueue(Queue *queue, UINT_t value) {
-  if (isFull(queue))
-    fprintf(stderr,"Queue is full.\n");
-  else {
-    if (queue->front == EMPTY) {
-      queue->front = 0;
-      queue->rear  = 0;
-      queue->items[queue->rear] = value;
-    } else {
-      queue->rear++;
-      queue->items[queue->rear] = value;
-    }
-  }
-}
-
-// Function to remove an element from the queue
-static UINT_t dequeue(Queue *queue) {
-  UINT_t item;
-  if (isEmpty(queue)) {
-    printf("Queue is empty.\n");
-    item = EMPTY;
-  } else {
-    item = queue->items[queue->front];
-    queue->front++;
-    if (queue->front > queue->rear)
-      queue->front = queue->rear = EMPTY;
-  }
-  return item;
-}
 
 // Function to perform breadth-first search
 static void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
@@ -2425,6 +2055,17 @@ static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *origin
 
 }
 
+static int compareEdge_t(const void *a, const void *b) {
+    edge_t arg1 = *(const edge_t *)a;
+    edge_t arg2 = *(const edge_t *)b;
+    if (arg1.src < arg2.src) return -1;
+    if (arg1.src > arg2.src) return 1;
+    if ((arg1.src == arg2.src) && (arg1.dst < arg2.dst)) return -1;
+    if ((arg1.src == arg2.src) && (arg1.dst > arg2.dst)) return 1;
+    return 0;
+}
+
+
 static void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
   FILE *infile = fopen(filename, "r");
   if (infile == NULL) {
@@ -2557,7 +2198,7 @@ main(int argc, char **argv) {
     fprintf(outfile,"Graph has %d vertices and %d undirected edges. Timing loop count %d.\n", originalGraph->numVertices, originalGraph->numEdges/2, LOOP_CNT);
 
   if (PRINT)
-    print_graph(originalGraph);
+    print_graph(originalGraph, outfile);
 
   if (!QUIET)
     fprintf(outfile,"%% of horizontal edges from bfs (k): %9.6f\n",tc_bader_compute_k(originalGraph));

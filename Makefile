@@ -6,19 +6,22 @@
 #PARALLEL = 
 PARALLEL = -DPARALLEL
 
+WARN =
+#WARN = -Wall
+
 # GCC
 CC 	= gcc
-CFLAGS1 = -DGCC $(PARALLEL) -Wall
-CFLAGS2 = -DGCC $(PARALLEL) -Wall -funroll-loops -funroll-all-loops -O2
-CFLAGS3 = -DGCC $(PARALLEL) -Wall -funroll-loops -funroll-all-loops -O3
+CFLAGS1 = -DGCC $(PARALLEL) $(WARN)
+CFLAGS2 = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O2
+CFLAGS3 = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O3
 
 # Intel ICX
 #CC      = icx
-#CFLAGS1 = -DICX -DPARALLEL -Wall
-#CFLAGS2 = -DICX -DPARALLEL -Wall -O2
-#CFLAGS3 = -DICX -DPARALLEL -Wall -O3
+#CFLAGS1 = -DICX -DPARALLEL $(WARN)
+#CFLAGS2 = -DICX -DPARALLEL $(WARN) -O2
+#CFLAGS3 = -DICX -DPARALLEL $(WARN) -O3
 
-OBJS = tc.o tc_parallel.o
+OBJS = queue.o graph.o tc.o tc_parallel.o
 
 #all: tc tcO2 tcO3
 all: tcO2
