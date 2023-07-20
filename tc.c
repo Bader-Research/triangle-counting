@@ -891,7 +891,7 @@ static UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
 
-  Hash = (bool *)calloc(m, sizeof(bool));
+  Hash = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Hash);
   
   for (v = 0; v < n ; v++) {
