@@ -4,7 +4,10 @@
 
 # Turn off/on OpenMP parallel code
 #PARALLEL = 
-PARALLEL = -DPARALLEL
+#GCC
+PARALLEL = -DPARALLEL -fopenmp
+#Intel ICX
+#PARALLEL = -DPARALLEL -qopenmp
 
 WARN =
 #WARN = -Wall

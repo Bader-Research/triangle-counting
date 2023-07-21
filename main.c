@@ -2,6 +2,10 @@
 #include "queue.h"
 #include "graph.h"
 #include "tc.h"
+#ifdef PARALLEL
+#include "tc_parallel.h"
+#include <omp.h>
+#endif
 
 #define DEFAULT_SCALE  10
 #define EDGE_FACTOR    16
@@ -13,6 +17,9 @@
 
 
 static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
+#ifdef PARALLEL
+static void benchmarkTC_P(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
+#endif
 
 static FILE *infile = NULL, *outfile = NULL;
 static char *INFILENAME = NULL;
@@ -49,6 +56,7 @@ static void parseFlags(int argc, char **argv) {
     switch (argv[1][1]) {
 
     case 'f':
+      if (argc < 3) usage();
       if (!QUIET)
 	printf("Input Graph: %s\n",argv[2]);
       infile = fopen(argv[2], "r");
@@ -60,6 +68,7 @@ static void parseFlags(int argc, char **argv) {
       break;
 
     case 'o':
+      if (argc < 3) usage();
       if (!QUIET)
 	printf("Output file: %s\n",argv[2]);
       outfile = fopen(argv[2], "a");
@@ -69,6 +78,7 @@ static void parseFlags(int argc, char **argv) {
       break;
 
     case 'r':
+      if (argc < 3) usage();
       SCALE = atoi(argv[2]);
       if (!QUIET)
 	printf("RMAT Scale: %d\n",SCALE);
@@ -98,6 +108,7 @@ static void parseFlags(int argc, char **argv) {
       break;
       
     case 'p':
+      if (argc < 3) usage();
       PARALLEL_PROCS = atoi(argv[2]);
       argv+=2;
       argc-=2;
@@ -162,6 +173,44 @@ static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *origin
   fflush(outfile);
 
 }
+
+#ifdef PARALLEL
+static void benchmarkTC_P(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
+  int loop, err;
+  double 
+    total_time,
+    over_time;
+  UINT_t numTriangles;
+  
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+    numTriangles = (*f)(graph);
+  }
+  total_time = get_seconds() - total_time;
+  err = check_triangleCount(graph,numTriangles);
+  if (!err) fprintf(stderr,"ERROR with %s\n",name);
+
+  over_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    copy_graph(originalGraph, graph);
+  }
+  over_time = get_seconds() - over_time;
+
+  total_time -= over_time;
+  total_time /= (double)LOOP_CNT;
+
+#pragma omp parallel
+#pragma omp master
+  fprintf(outfile,"TC_P\t%s\t%12d\t%12d\t%-30s\t%9.6f\t%12d\t%12d\n",
+	  INFILENAME,
+	  graph->numVertices, (graph->numEdges)/2,
+	  name, total_time, numTriangles,
+	  omp_get_num_threads());
+  fflush(outfile);
+
+}
+#endif
 
 static int compareEdge_t(const void *a, const void *b) {
     edge_t arg1 = *(const edge_t *)a;
@@ -346,6 +395,22 @@ main(int argc, char **argv) {
     benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
   if (NCUBED)
     benchmarkTC(tc_triples_DO, originalGraph, graph, "tc_triples_DO");
+
+#ifdef PARALLEL
+
+  omp_set_num_threads(PARALLEL_MAX ? omp_get_max_threads() : PARALLEL_PROCS);
+#pragma omp parallel
+  if (!QUIET) {
+#pragma omp master
+    fprintf(outfile,"OpenMP threads: %12d\n",omp_get_num_threads());
+  }
+
+  
+  if (NCUBED)
+    benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");
+  if (NCUBED)
+    benchmarkTC_P(tc_triples_DO_P, originalGraph, graph, "tc_triples_DO_P");
+#endif
   
   free_graph(originalGraph);
   free_graph(graph);
