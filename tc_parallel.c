@@ -135,5 +135,65 @@ UINT_t tc_wedge_P(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_wedge_DO_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
+  /* Direction oriented. */
+  
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  int numThreads;
+  UINT_t *mycount;
+  
+#pragma omp parallel
+  {
+#pragma omp master
+    numThreads = omp_get_num_threads();
+  }
+  mycount = (UINT_t *)calloc(numThreads, sizeof(UINT_t));
+  assert_malloc(mycount);
+
+#pragma omp parallel
+  {
+    int myID = omp_get_thread_num();
+#pragma omp for schedule(dynamic)
+    for (UINT_t i = 0; i < n; i++) {
+      UINT_t s = Ap[i];
+      UINT_t e = Ap[i + 1];
+
+      for (UINT_t j = s; j < e; j++) {
+	UINT_t neighbor1 = Ai[j];
+	if (neighbor1 > i) {
+
+	  for (UINT_t k = s; k < e; k++) {
+	    UINT_t neighbor2 = Ai[k];
+
+	    if ((neighbor1 != neighbor2) && (neighbor2 > neighbor1)) {
+	      UINT_t s_n1 = Ap[neighbor1];
+	      UINT_t e_n1 = Ap[neighbor1 + 1];
+	  
+	      for (UINT_t l = s_n1; l < e_n1; l++) {
+		if (Ai[l] == neighbor2) {
+		  mycount[myID]++;
+		  break;
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+#pragma omp parallel for reduction(+:count)
+  for (int i = 0; i < numThreads ; i++)
+    count += mycount[i];
+
+  return count;
+}
+
 
 #endif

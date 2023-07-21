@@ -5,6 +5,8 @@
 
 UINT_t tc_triples_P(const GRAPH_TYPE *);
 UINT_t tc_triples_DO_P(const GRAPH_TYPE *);
+UINT_t tc_wedge_P(const GRAPH_TYPE *);
+UINT_t tc_wedge_DO_P(const GRAPH_TYPE *);
 
 #endif
 
