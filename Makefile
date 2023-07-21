@@ -21,7 +21,8 @@ CFLAGS3 = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O3
 #CFLAGS2 = -DICX -DPARALLEL $(WARN) -O2
 #CFLAGS3 = -DICX -DPARALLEL $(WARN) -O3
 
-OBJS = queue.o graph.o tc.o tc_parallel.o
+SRCS = $(wildcard *.c)
+OBJS = $(SRCS:.c=.o)
 
 #all: tc tcO2 tcO3
 all: tcO2

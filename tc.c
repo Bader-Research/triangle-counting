@@ -1,150 +1,17 @@
 #include "types.h"
 #include "queue.h"
 #include "graph.h"
+#include "tc.h"
 
-#define DEFAULT_SCALE  10
-#define EDGE_FACTOR    16
-#ifndef LOOP_CNT
-#define LOOP_CNT       10
-#endif
-#define SCALE_MIN       6
-#define DEBUG           0
-
-#ifdef GCC
-#define INLINE inline
-/* #define INLINE */
-#else
-#define INLINE
-#endif
-
-
-static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
-
-static double tc_bader_compute_k(const GRAPH_TYPE *);
 
 static void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
 static void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
-
-static FILE *infile = NULL, *outfile = NULL;
-static char *INFILENAME = NULL;
-static int SCALE = 0;
-static bool input_selected = 0;
-
-static void usage(void) {
-
-  printf("Triangle Counting\n\n");
-  printf("Usage:\n\n");
-  printf("Either one of these two must be selected:\n");
-  printf(" -f <filename>   [Input Graph in Matrix Market format]\n");
-  printf(" -r SCALE        [Use RMAT graph of size SCALE] (SCALE must be >= %d) \n", SCALE_MIN);
-  printf("Optional arguments:\n");
-  printf(" -o <filename>   [Output File]\n");
-#ifdef PARALLEL
-  printf(" -p #            [Parallel: Use # threads/cores]\n");
-  printf(" -P              [Parallel: Use maximum number of cores]\n");
-#endif
-  printf(" -d              [Display/Print Input Graph]\n");
-  printf(" -q              [Turn on Quiet mode]\n");
-  printf(" -x              [Do not run N^3 algorithms]\n");
-  exit (8);
-}
-
-static void parseFlags(int argc, char **argv) {
-
-  if (argc < 1) usage();
-  infile = NULL;
-  QUIET = 0;
-
-  while ((argc > 1) && (argv[1][0] == '-')) {
-
-    switch (argv[1][1]) {
-
-    case 'f':
-      if (!QUIET)
-	printf("Input Graph: %s\n",argv[2]);
-      infile = fopen(argv[2], "r");
-      if (infile == NULL) usage();
-      INFILENAME = argv[2];
-      input_selected = true;
-      argv+=2;
-      argc-=2;
-      break;
-
-    case 'o':
-      if (!QUIET)
-	printf("Output file: %s\n",argv[2]);
-      outfile = fopen(argv[2], "a");
-      if (outfile == NULL) usage();
-      argv+=2;
-      argc-=2;
-      break;
-
-    case 'r':
-      SCALE = atoi(argv[2]);
-      if (!QUIET)
-	printf("RMAT Scale: %d\n",SCALE);
-      INFILENAME = "RMAT";
-      if (SCALE >= SCALE_MIN) input_selected = true;
-      argv+=2;
-      argc-=2;
-      break;
-
-    case 'q':
-      QUIET = 1;
-      argv++;
-      argc--;
-      break;
-	
-    case 'd':
-      PRINT = 1;
-      argv++;
-      argc--;
-      break;
-	
-#ifdef PARALLEL
-    case 'P':
-      PARALLEL_MAX = true;
-      argv++;
-      argc--;
-      break;
-      
-    case 'p':
-      PARALLEL_PROCS = atoi(argv[2]);
-      argv+=2;
-      argc-=2;
-      break;
-#endif
-	
-    case 'x':
-      NCUBED = 0;
-      argv++;
-      argc--;
-      break;
-	
-    default:
-      fprintf(stderr,"Wrong Argument: %s\n", argv[1]);
-      usage();
-    }
-
-  }
-
-  if (!input_selected) usage();
-  
-  return;
-}
-
-static UINT_t correctTriangleCount;
-/* Check the correctness of the triangle count.
-   Return 1 if worked, 0 if failed */
-bool check_triangleCount(const GRAPH_TYPE *graph, const UINT_t numTriangles) {
-  return (numTriangles==correctTriangleCount);
-}
 
 
 /* Algorithm from
    T. A. Davis, "Graph algorithms via SuiteSparse: GraphBLAS: triangle counting and K-truss," 2018 IEEE High Performance extreme Computing Conference (HPEC), Waltham, MA, USA, 2018, pp. 1-6, doi: 10.1109/HPEC.2018.8547538.
 */
-static UINT_t tc_davis // # of triangles
+UINT_t tc_davis // # of triangles
 (
 #if 1
 const GRAPH_TYPE *graph
@@ -184,7 +51,7 @@ const UINT_t n // A is n-by-n
 }
  
 
-static UINT_t tc_wedge(const GRAPH_TYPE *graph) {
+UINT_t tc_wedge(const GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
   UINT_t count = 0;
 
@@ -220,7 +87,7 @@ static UINT_t tc_wedge(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-static UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each vertex i, for each open wedge (j, i, k), determine if there's a closing edge (j, k) */
   /* Direction oriented. */
   
@@ -261,7 +128,7 @@ static UINT_t tc_wedge_DO(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_triples(const GRAPH_TYPE *graph) {
+UINT_t tc_triples(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   
   register UINT_t i, j, k;
@@ -281,7 +148,7 @@ static UINT_t tc_triples(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-static UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
   /* Direction oriented. */
   
@@ -335,7 +202,7 @@ static UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, co
   return count;
 }
 
-static UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   
   register UINT_t v, w;
@@ -358,7 +225,7 @@ static UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-static UINT_t tc_intersectMergePath_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectMergePath_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
   /* Direction oriented. */
   
@@ -429,7 +296,7 @@ static UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v,
   return count;
 }
 
-static UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
 
   register UINT_t v, w;
@@ -452,7 +319,7 @@ static UINT_t tc_intersectBinarySearch(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-static UINT_t tc_intersectBinarySearch_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectBinarySearch_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
   /* Direction oriented. */
 
@@ -547,7 +414,7 @@ static UINT_t searchLists_with_partitioning(const UINT_t* list1, const INT_t s1,
 }
 
 
-static UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
   
   register UINT_t v, w;
@@ -570,7 +437,7 @@ static UINT_t tc_intersectPartition(const GRAPH_TYPE *graph) {
   return (count/6);
 }
 
-static UINT_t tc_intersectPartition_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectPartition_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
   /* Direction oriented. */
   
@@ -634,7 +501,7 @@ static UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_
   return count;
 }
 
-static UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
 
   register UINT_t v, w;
@@ -665,7 +532,7 @@ static UINT_t tc_intersectHash(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
+UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
   /* Direction oriented. */
 
@@ -703,7 +570,7 @@ static UINT_t tc_intersectHash_DO(const GRAPH_TYPE *graph) {
    2017 IEEE High Performance Extreme Computing Conference (HPEC),
    Waltham, MA, USA, 2017, pp. 1-6,
    doi: 10.1109/HPEC.2017.8091046. */
-static UINT_t tc_low(
+UINT_t tc_low(
 #if 1
 			const GRAPH_TYPE *graph
 #else
@@ -871,7 +738,7 @@ static void remove_treelist(const GRAPH_TYPE* graph, bool *E, const UINT_t *pare
 }
 
   
-static UINT_t tc_treelist(const GRAPH_TYPE *graph) {
+UINT_t tc_treelist(const GRAPH_TYPE *graph) {
   /* Itai and Rodeh, SIAM Journal of Computing, 1978 */
   UINT_t count = 0;
   UINT_t *parent;
@@ -1051,7 +918,7 @@ static void remove_treelist2(GRAPH_TYPE* graph, const UINT_t *parent) {
   return;
 }
 
-static UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
+UINT_t tc_treelist2(const GRAPH_TYPE *graph) {
   /* Itai and Rodeh, SIAM Journal of Computing, 1978 */
   UINT_t edges;
   UINT_t count = 0;
@@ -1227,7 +1094,7 @@ static UINT_t intersectSizeHashSkip_forward(const GRAPH_TYPE *graph, bool *Hash,
 }
 
 
-static UINT_t tc_forward(const GRAPH_TYPE *graph) {
+UINT_t tc_forward(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1307,7 +1174,7 @@ static UINT_t tc_forward_hash_config_size(const GRAPH_TYPE *graph, UINT_t hashSi
   return count;
 }
 
-static UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash(const GRAPH_TYPE *graph) {
   return tc_forward_hash_config_size(graph, 0);
 }
 
@@ -1353,11 +1220,11 @@ static UINT_t tc_forward_hash_skip_config_size(const GRAPH_TYPE *graph, UINT_t h
   return count;
 }
 
-static UINT_t tc_forward_hash_skip(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_skip(const GRAPH_TYPE *graph) {
   return tc_forward_hash_skip_config_size(graph, 0);
 }
 
-static UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1374,7 +1241,7 @@ static UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
 
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
@@ -1498,7 +1365,7 @@ static void bader_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t* 
 }
 
 
-static double tc_bader_compute_k(const GRAPH_TYPE *graph) {
+double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* restrict level;
   UINT_t s, e, l, w;
@@ -1539,7 +1406,7 @@ static double tc_bader_compute_k(const GRAPH_TYPE *graph) {
   return (2.0 * (double)k/(double)graph->numEdges);
 }
 
-static UINT_t tc_bader(const GRAPH_TYPE *graph) {
+UINT_t tc_bader(const GRAPH_TYPE *graph) {
   /* Direction orientied. */
   UINT_t* restrict level;
   UINT_t s, e, l, w;
@@ -1577,7 +1444,7 @@ static UINT_t tc_bader(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_bader3(const GRAPH_TYPE *graph) {
+UINT_t tc_bader3(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -1644,7 +1511,7 @@ static UINT_t tc_bader3(const GRAPH_TYPE *graph) {
 
 
 
-static UINT_t tc_bader4(const GRAPH_TYPE *graph) {
+UINT_t tc_bader4(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -1718,7 +1585,7 @@ static UINT_t tc_bader4(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
+UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -1730,7 +1597,7 @@ static UINT_t tc_bader4_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_bader5(const GRAPH_TYPE *graph) {
+UINT_t tc_bader5(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -1843,7 +1710,7 @@ static UINT_t bader2_intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_
 }
 
 
-static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
+UINT_t tc_bader2(const GRAPH_TYPE *graph) {
   /* Instead of c1, c2, use a single counter for triangles */
   /* Direction orientied. */
   UINT_t* restrict level;
@@ -1881,7 +1748,7 @@ static UINT_t tc_bader2(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
+UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2005,7 +1872,7 @@ static UINT_t tc_bader_forward_hash(const GRAPH_TYPE *graph) {
 }
 
 
-static UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
+UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -2020,235 +1887,4 @@ static UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
-
-
-static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
-  int loop, err;
-  double 
-    total_time,
-    over_time;
-  UINT_t numTriangles;
-  
-  total_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-    numTriangles = (*f)(graph);
-  }
-  total_time = get_seconds() - total_time;
-  err = check_triangleCount(graph,numTriangles);
-  if (!err) fprintf(stderr,"ERROR with %s\n",name);
-
-  over_time = get_seconds();
-  for (loop=0 ; loop<LOOP_CNT ; loop++) {
-    copy_graph(originalGraph, graph);
-  }
-  over_time = get_seconds() - over_time;
-
-  total_time -= over_time;
-  total_time /= (double)LOOP_CNT;
-
-  fprintf(outfile,"TC\t%s\t%12d\t%12d\t%-30s\t%9.6f\t%12d\n",
-	  INFILENAME,
-	  graph->numVertices, (graph->numEdges)/2,
-	  name, total_time, numTriangles);
-  fflush(outfile);
-
-}
-
-static int compareEdge_t(const void *a, const void *b) {
-    edge_t arg1 = *(const edge_t *)a;
-    edge_t arg2 = *(const edge_t *)b;
-    if (arg1.src < arg2.src) return -1;
-    if (arg1.src > arg2.src) return 1;
-    if ((arg1.src == arg2.src) && (arg1.dst < arg2.dst)) return -1;
-    if ((arg1.src == arg2.src) && (arg1.dst > arg2.dst)) return 1;
-    return 0;
-}
-
-
-static void readMatrixMarketFile(const char *filename, GRAPH_TYPE* graph) {
-  FILE *infile = fopen(filename, "r");
-  if (infile == NULL) {
-    printf("Error opening file %s.\n", filename);
-    exit(1);
-  }
-
-  char line[256];
-  UINT_t num_rows, num_cols, num_entries;
-
-  // Skip the header lines
-  do {
-    fgets(line, sizeof(line), infile);
-  } while (line[0] == '%');
-
-  sscanf(line, "%d %d %d", &num_rows, &num_cols, &num_entries);
-
-  if (num_rows != num_cols) {
-    fprintf(stderr,"ERROR: Matrix Market input file is not square: rows: %d  cols: %d  nnz: %d\n",
-	    num_rows, num_cols, num_entries);
-    exit(-1);
-  }
-
-#if DEBUG
-  printf("readMatrixMarketFile: %d %d %d\n",num_rows, num_cols, num_entries);
-#endif
-
-  UINT_t edgeCount = 0;
-  edge_t* edges = (edge_t*)calloc(2*num_entries, sizeof(edge_t));
-  assert_malloc(edges);
-
-  for (UINT_t i = 0; i < num_entries; i++) {
-    UINT_t row, col;
-    if (fscanf(infile, "%d %d\n", &row, &col) != 2) {
-      fprintf(stderr,"Invalid Matrix Market file: bad entry.\n");
-      fclose(infile);
-      fclose(outfile);
-      exit(8);
-    }
-    if ((row > num_rows) || (col > num_rows)) {
-      fprintf(stderr,"Invalid Matrix Market file: entry out of range.\n");
-      fclose(infile);
-      fclose(outfile);
-      exit(8);
-    }
-
-    edges[edgeCount].src = row - 1;
-    edges[edgeCount].dst = col - 1;
-    edgeCount++;
-    edges[edgeCount].src = col - 1;
-    edges[edgeCount].dst = row - 1;
-    edgeCount++;
-  }
-
-  qsort(edges, edgeCount, sizeof(edge_t), compareEdge_t);
-
-  edge_t* edgesNoDup = (edge_t*)calloc(2*num_entries, sizeof(edge_t));
-  assert_malloc(edgesNoDup);
-
-  UINT_t edgeCountNoDup;
-  edge_t lastedge;
-  lastedge.src = edges[0].src;
-  lastedge.dst = edges[0].dst;
-  edgesNoDup[0].src = edges[0].src;
-  edgesNoDup[0].dst = edges[0].dst;
-  edgeCountNoDup = 1;
-  for (UINT_t i=0 ; i<edgeCount ; i++) {
-    if (compareEdge_t(&lastedge,&edges[i])!=0) {
-      edgesNoDup[edgeCountNoDup].src = edges[i].src;
-      edgesNoDup[edgeCountNoDup].dst = edges[i].dst;
-      edgeCountNoDup++;
-      lastedge.src = edges[i].src;
-      lastedge.dst = edges[i].dst;
-    }
-  }
-    
-    
-  graph->numVertices = num_rows;
-  graph->numEdges = edgeCountNoDup;
-  allocate_graph(graph);
-
-  convert_edges_to_graph(edgesNoDup, graph);
-
-  free(edgesNoDup);
-  free(edges);
-
-  fclose(infile);
-  return;
-}
-
-
-
-int
-main(int argc, char **argv) {
-  UINT_t numTriangles = 0;
-
-  outfile = stdout;
-
-  parseFlags(argc, argv);
-  
-  GRAPH_TYPE 
-    *originalGraph,
-    *graph;
-
-  originalGraph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(originalGraph);
-  graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(graph);
-
-
-  if (SCALE) {
-    allocate_graph_RMAT(SCALE, EDGE_FACTOR, originalGraph);
-    create_graph_RMAT(originalGraph, SCALE);
-    allocate_graph_RMAT(SCALE, EDGE_FACTOR, graph);
-  }
-  else {
-    if (INFILENAME != NULL) {
-      readMatrixMarketFile(INFILENAME, originalGraph);
-      graph->numVertices = originalGraph->numVertices;
-      graph->numEdges = originalGraph->numEdges;
-      allocate_graph(graph);
-    }
-    else {
-      fprintf(stderr,"ERROR: No input graph selected.\n");
-      exit(8);
-    }
-  }
-
-  if (!QUIET)
-    fprintf(outfile,"Graph has %d vertices and %d undirected edges. Timing loop count %d.\n", originalGraph->numVertices, originalGraph->numEdges/2, LOOP_CNT);
-
-  if (PRINT)
-    print_graph(originalGraph, outfile);
-
-  if (!QUIET)
-    fprintf(outfile,"%% of horizontal edges from bfs (k): %9.6f\n",tc_bader_compute_k(originalGraph));
-
-  copy_graph(originalGraph, graph);
-  numTriangles = tc_wedge(graph);
-  correctTriangleCount = numTriangles;
-
-  benchmarkTC(tc_wedge, originalGraph, graph, "tc_wedge");
-  benchmarkTC(tc_wedge_DO, originalGraph, graph, "tc_wedge_DO");
-  benchmarkTC(tc_intersectMergePath, originalGraph, graph, "tc_intersect_MergePath");
-  benchmarkTC(tc_intersectMergePath_DO, originalGraph, graph, "tc_intersect_MergePath_DO");
-  benchmarkTC(tc_intersectBinarySearch, originalGraph, graph, "tc_intersect_BinarySearch");
-  benchmarkTC(tc_intersectBinarySearch_DO, originalGraph, graph, "tc_intersect_BinarySearch_DO");
-  benchmarkTC(tc_intersectPartition, originalGraph, graph, "tc_intersect_Partition");
-  benchmarkTC(tc_intersectPartition_DO, originalGraph, graph, "tc_intersect_Partition_DO");
-  benchmarkTC(tc_intersectHash, originalGraph, graph, "tc_intersect_Hash");
-  benchmarkTC(tc_intersectHash_DO, originalGraph, graph, "tc_intersect_Hash_DO");
-  benchmarkTC(tc_forward, originalGraph, graph, "tc_forward");
-  benchmarkTC(tc_forward_hash, originalGraph, graph, "tc_forward_hash");
-  benchmarkTC(tc_forward_hash_skip, originalGraph, graph, "tc_forward_hash_skip");
-  benchmarkTC(tc_forward_hash_degreeOrder, originalGraph, graph, "tc_forward_hash_degreeOrder");
-  benchmarkTC(tc_forward_hash_degreeOrderReverse, originalGraph, graph, "tc_forward_hash_degreeOrderRev");
-  benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
-  benchmarkTC(tc_low, originalGraph, graph, "tc_low");
-  benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");
-  benchmarkTC(tc_bader2, originalGraph, graph, "tc_bader2");
-  benchmarkTC(tc_bader3, originalGraph, graph, "tc_bader3");
-  benchmarkTC(tc_bader4, originalGraph, graph, "tc_bader4");
-  benchmarkTC(tc_bader5, originalGraph, graph, "tc_bader5");
-  benchmarkTC(tc_bader4_degreeOrder, originalGraph, graph, "tc_bader4_degreeOrder");
-  benchmarkTC(tc_bader_forward_hash, originalGraph, graph, "tc_bader_forward_hash");
-  benchmarkTC(tc_bader_forward_hash_degreeOrder, originalGraph, graph, "tc_bader_forward_hash_degOrd");
-  benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
-  benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
-  if (NCUBED)
-    benchmarkTC(tc_triples, originalGraph, graph, "tc_triples");
-  if (NCUBED)
-    benchmarkTC(tc_triples_DO, originalGraph, graph, "tc_triples_DO");
-  
-  free_graph(originalGraph);
-  free_graph(graph);
-
-#if 0
-  if (!QUIET)
-    fprintf(outfile,"Number of Triangles: %12d\n",numTriangles);
-#endif
-
-  fclose(outfile);
-  
-  return(0);
-}
 

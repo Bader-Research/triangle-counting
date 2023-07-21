@@ -62,5 +62,12 @@ static bool PARALLEL_MAX = false;
 static int  PARALLEL_PROCS = 0;
 #endif
 
+#ifdef GCC
+#define INLINE inline
+/* #define INLINE */
+#else
+#define INLINE
+#endif
+
 
 #endif
