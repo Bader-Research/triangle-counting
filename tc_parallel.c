@@ -100,7 +100,7 @@ UINT_t tc_wedge_P(const GRAPH_TYPE *graph) {
 #pragma omp parallel
   {
     int myID = omp_get_thread_num();
-#pragma omp for
+#pragma omp for schedule(dynamic)
     for (UINT_t i = 0; i < n; i++) {
       UINT_t s = Ap[i];
       UINT_t e = Ap[i + 1];
