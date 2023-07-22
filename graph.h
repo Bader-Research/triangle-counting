@@ -16,6 +16,7 @@ GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *, enum reorderDegree_t reo
 UINT_t intersectSizeMergePath(const GRAPH_TYPE*, const UINT_t, const UINT_t);
 UINT_t intersectSizeBinarySearch(const GRAPH_TYPE*, const UINT_t, const UINT_t);
 UINT_t searchLists_with_partitioning(const UINT_t*, const INT_t, const INT_t, const UINT_t*, const INT_t, const INT_t);
+UINT_t intersectSizeHash(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t);
 
 
 #endif

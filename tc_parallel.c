@@ -6,14 +6,21 @@
 #include <omp.h>
 
 
-#define PBODY(foo) \
-  int numThreads; \
+int get_num_threads() {
+  int numThreads;
+#pragma omp parallel
+  {
+#pragma omp master
+    numThreads = omp_get_num_threads();
+  }
+
+  return numThreads;
+}
+
+
+#define PBODY(foo)	  \
+  int numThreads = get_num_threads(); \
   UINT_t *mycount; \
-  _Pragma("omp parallel") \
-  { \
-    _Pragma("omp master") \
-    numThreads = omp_get_num_threads(); \
-  } \
   mycount = (UINT_t *)calloc(numThreads, sizeof(UINT_t)); \
   assert_malloc(mycount); \
   _Pragma("omp parallel") \
@@ -28,6 +35,7 @@
 
 #define myCount mycount[myID]
 
+  
 
 UINT_t tc_triples_P(const GRAPH_TYPE *graph) {
   /* Algorithm: for each triple (i, j, k), determine if the three triangle edges exist. */
@@ -294,6 +302,72 @@ UINT_t tc_intersectPartition_DO_P(const GRAPH_TYPE *graph) {
   return (count/3);
 }
 
+
+UINT_t tc_intersectHash_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
+
+  UINT_t count = 0;
+
+  bool *Hash;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  Hash = (bool *)calloc(n * get_num_threads(), sizeof(bool));
+  assert_malloc(Hash);
+  
+  PBODY(
+	for (UINT_t v = 0; v < n ; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    myCount += intersectSizeHash(graph, Hash + (myID * n), v, w);
+	  }
+	}
+	);
+
+  free(Hash);
+
+  return (count/6);
+}
+
+
+
+
+UINT_t tc_intersectHash_DO_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a hash. */
+  /* Direction oriented. */
+
+  UINT_t count = 0;
+
+  bool *Hash;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  Hash = (bool *)calloc(n * get_num_threads(), sizeof(bool));
+  assert_malloc(Hash);
+
+  PBODY(
+	for (UINT_t v = 0; v < n ; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    if (v < w)
+	      myCount += intersectSizeHash(graph, Hash + (myID * n), v, w);
+	  }
+	}
+	);
+
+  free(Hash);
+
+  return (count/3);
+}
 
 
 

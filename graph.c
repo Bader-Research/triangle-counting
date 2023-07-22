@@ -416,3 +416,40 @@ UINT_t searchLists_with_partitioning(const UINT_t* list1, const INT_t s1, const 
 }
 
 
+UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w) {
+
+  register UINT_t vb, ve, wb, we;
+  register UINT_t s1, e1, s2, e2;
+  UINT_t count = 0;
+  
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+
+  vb = Ap[v  ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
+
+  if ((ve-vb) < (we-wb)) {
+    s1 = vb;
+    e1 = ve;
+    s2 = wb;
+    e2 = we;
+  } else {
+    s1 = wb;
+    e1 = we;
+    s2 = vb;
+    e2 = ve;
+  }
+  
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[Ai[i]] = true;
+
+  for (UINT_t i= s2; i<e2 ; i++)
+    if (Hash[Ai[i]]) count++;
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[Ai[i]] = false;
+
+  return count;
+}
