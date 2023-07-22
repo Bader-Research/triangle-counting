@@ -13,5 +13,8 @@ bool check_edge(const GRAPH_TYPE *, const UINT_t, const UINT_t);
 enum reorderDegree_t { REORDER_HIGHEST_DEGREE_FIRST = 0, REORDER_LOWEST_DEGREE_FIRST };
 GRAPH_TYPE *reorder_graph_by_degree(const GRAPH_TYPE *, enum reorderDegree_t reorderDegree);
 
+UINT_t intersectSizeMergePath(const GRAPH_TYPE*, const UINT_t, const UINT_t);
+
+
 #endif
 

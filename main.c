@@ -408,6 +408,8 @@ main(int argc, char **argv) {
   
   benchmarkTC_P(tc_wedge_P, originalGraph, graph, "tc_wedge_P");
   benchmarkTC_P(tc_wedge_DO_P, originalGraph, graph, "tc_wedge_DO_P");
+  benchmarkTC_P(tc_intersectMergePath_P, originalGraph, graph, "tc_intersect_MergePath_P");
+  benchmarkTC_P(tc_intersectMergePath_DO_P, originalGraph, graph, "tc_intersect_MergePath_DO_P");
   if (NCUBED)
     benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");
   if (NCUBED)

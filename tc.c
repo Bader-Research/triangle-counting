@@ -172,35 +172,6 @@ UINT_t tc_triples_DO(const GRAPH_TYPE *graph) {
 
 
 
-static UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
-  register UINT_t vb, ve, wb, we;
-  register UINT_t ptr_v, ptr_w;
-  UINT_t count = 0;
-
-  const UINT_t* restrict Ap = graph->rowPtr;
-  const UINT_t* restrict Ai = graph->colInd;
-  
-  vb = Ap[v ];
-  ve = Ap[v+1];
-  wb = Ap[w  ];
-  we = Ap[w+1];
-
-  ptr_v = vb;
-  ptr_w = wb;
-  while ((ptr_v < ve) && (ptr_w < we)) {
-    if (Ai[ptr_v] == Ai[ptr_w]) {
-      count++;
-      ptr_v++;
-      ptr_w++;
-    }
-    else
-      if (Ai[ptr_v] < Ai[ptr_w])
-	ptr_v++;
-      else
-	ptr_w++;
-  }
-  return count;
-}
 
 UINT_t tc_intersectMergePath(const GRAPH_TYPE *graph) {
   /* Algorithm: For each edge (i, j), find the size of its intersection using a linear scan. */
