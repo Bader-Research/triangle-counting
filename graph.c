@@ -298,3 +298,51 @@ UINT_t intersectSizeMergePath(const GRAPH_TYPE* graph, const UINT_t v, const UIN
   }
   return count;
 }
+
+
+static INT_t binarySearch(const UINT_t* list, const UINT_t start, const UINT_t end, const UINT_t target) {
+  register INT_t s=start, e=end, mid;
+  while (s < e) {
+    mid = s + (e - s) / 2;
+    if (list[mid] == target)
+      return mid;
+
+    if (list[mid] < target)
+      s = mid + 1;
+    else
+      e = mid;
+  }
+  return -1;
+}
+
+UINT_t intersectSizeBinarySearch(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w) {
+  register UINT_t vb, ve, wb, we;
+  UINT_t count=0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  if ((v<0) || (v >= n) || (w<0) || (w >= n)) {
+    fprintf(stderr,"vertices out of range in intersectSize()\n");
+    exit(-1);
+  }
+  vb = Ap[v  ];
+  ve = Ap[v+1];
+  wb = Ap[w  ];
+  we = Ap[w+1];
+
+  UINT_t size_v = ve-vb;
+  UINT_t size_w = we-wb;
+
+  if (size_v <= size_w) {
+    for (UINT_t i=vb ; i<ve ; i++)
+      if (binarySearch((UINT_t *)Ai, wb, we, Ai[i])>=0) count++;
+  } else {
+    for (UINT_t i=wb ; i<we ; i++)
+      if (binarySearch((UINT_t *)Ai, vb, ve, Ai[i])>=0) count++;
+  }
+
+  return count;
+}
+

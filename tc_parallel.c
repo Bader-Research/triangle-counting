@@ -197,6 +197,54 @@ UINT_t tc_intersectMergePath_DO_P(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_intersectBinarySearch_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
+
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  PBODY(
+	for (UINT_t v = 0; v < n; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    myCount += intersectSizeBinarySearch(graph, v, w);
+	  }
+	}
+	);
+
+  return (count/6);
+}
+
+UINT_t tc_intersectBinarySearch_DO_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search. */
+  /* Direction oriented. */
+
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  PBODY(
+	for (UINT_t v = 0; v < n; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    if (v < w)
+	      myCount += intersectSizeBinarySearch(graph, v, w);
+	  }
+	}
+	);
+
+  return (count/3);
+}
+
 
 
 #endif
