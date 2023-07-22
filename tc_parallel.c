@@ -246,6 +246,56 @@ UINT_t tc_intersectBinarySearch_DO_P(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_intersectPartition_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
+  
+  UINT_t count = 0;
+
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  PBODY(
+	for (UINT_t v = 0; v < n ; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    myCount += searchLists_with_partitioning((UINT_t *)Ai, (INT_t) Ap[v], (INT_t)Ap[v+1]-1, (UINT_t *)Ai, (INT_t)Ap[w], (INT_t)Ap[w+1]-1);
+	  }
+	}
+	);
+
+  return (count/6);
+}
+
+UINT_t tc_intersectPartition_DO_P(const GRAPH_TYPE *graph) {
+  /* Algorithm: For each edge (i, j), find the size of its intersection using a binary search-based partition. */
+  /* Direction oriented. */
+  
+  UINT_t count = 0;
+
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  PBODY(
+	for (UINT_t v = 0; v < n; v++) {
+	  UINT_t b = Ap[v  ];
+	  UINT_t e = Ap[v+1];
+	  for (UINT_t i=b ; i<e ; i++) {
+	    UINT_t w  = Ai[i];
+	    if (v < w)
+	      myCount += searchLists_with_partitioning((UINT_t *)Ai, (INT_t) Ap[v], (INT_t)Ap[v+1]-1, (UINT_t *)Ai, (INT_t)Ap[w], (INT_t)Ap[w+1]-1);
+	  }
+	}
+	);
+
+  return (count/3);
+}
+
+
+
 
 #endif
 

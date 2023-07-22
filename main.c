@@ -412,6 +412,8 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_intersectMergePath_DO_P, originalGraph, graph, "tc_intersect_MergePath_DO_P");
   benchmarkTC_P(tc_intersectBinarySearch_P, originalGraph, graph, "tc_intersect_BinarySearch_P");
   benchmarkTC_P(tc_intersectBinarySearch_DO_P, originalGraph, graph, "tc_intersect_BinarySearch_DO_P");
+  benchmarkTC_P(tc_intersectPartition_P, originalGraph, graph, "tc_intersect_Partition_P");
+  benchmarkTC_P(tc_intersectPartition_DO_P, originalGraph, graph, "tc_intersect_Partition_DO_P");
   if (NCUBED)
     benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");
   if (NCUBED)
