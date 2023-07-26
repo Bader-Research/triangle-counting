@@ -546,18 +546,25 @@ void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex
 //        end for
 
 
-void top_down_step(UINT_t* frontier, UINT_t* next, int* parents, const GRAPH_TYPE* graph, UINT_t frontier_size) {
-    UINT_t next_size = 0; // track number of elements in the next array
-    for (UINT_t i = 0; i < frontier_size; i++) {
-        UINT_t v = frontier[i];
-        for (UINT_t j = graph->rowPtr[v]; j < graph->rowPtr[v + 1]; j++) {
-            UINT_t n = graph->colInd[j];
-            if (parents[n] == -1) {
-                parents[n] = v;
-                next[next_size++] = n;
-            }
-        }
+void top_down_step(UINT_t* frontier, UINT_t* next, bool* visited, const GRAPH_TYPE* graph, UINT_t frontier_size, UINT_t *level) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t next_size = 0; // track number of elements in the next array
+  for (UINT_t i = 0; i < frontier_size; i++) {
+    UINT_t v = frontier[i];
+    for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+      UINT_t w = Ai[j];
+      if (!visited[w]) {
+	visited[w] = true;
+	level[w] = level[v] + 1;
+	next[next_size++] = w;
+      }
     }
+  }
 }
 //
 //    function bottom-up-step(frontier, next, parents)
@@ -573,21 +580,28 @@ void top_down_step(UINT_t* frontier, UINT_t* next, int* parents, const GRAPH_TYP
 //            end if
 //        end for
 
-void bottom_up_step(UINT_t* frontier, UINT_t* next, int* parents, const GRAPH_TYPE* graph, UINT_t frontier_size) {
-    UINT_t next_size = 0;
-    for (UINT_t i = 0; i < frontier_size; i++) {
-        UINT_t v = frontier[i];
-        if (parents[v] == -1) {
-            for (UINT_t j = graph->rowPtr[v]; j < graph->rowPtr[v + 1]; j++) {
-                UINT_t n = graph->colInd[j];
-                if (n == frontier[j]) {
-                    parents[v] = n;
-                    next[next_size++] = v;
-                    break;
-                }
-            }
-        }
+void bottom_up_step(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH_TYPE* graph, UINT_t frontier_size, UINT_t *level) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t next_size = 0;
+  for (UINT_t i = 0; i < frontier_size; i++) {
+    UINT_t v = frontier[i];
+    if (!visited[v]) {
+      for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+	UINT_t w = Ai[j];
+	if (w == frontier[j]) {
+	  visited[v] = true;
+	  level[v] = level[w] + 1;
+	  next[next_size++] = v;
+	  break;
+	}
+      }
     }
+  }
 }
 
 //function breadth-first-search(graph, source)
@@ -602,64 +616,65 @@ void bottom_up_step(UINT_t* frontier, UINT_t* next, int* parents, const GRAPH_TY
 //    return tree
 
 // frontier - vertices that considered for exploration
-void bfs_hybrid(const GRAPH_TYPE* graph, int* parents) {
-    UINT_t* frontier = (UINT_t*)malloc(graph->numVertices * sizeof(UINT_t));
-    UINT_t* next = (UINT_t*)malloc(graph->numVertices * sizeof(UINT_t));
-    UINT_t frontierSize = 0, nextSize = 0;
+void bfs_hybrid_visited(const GRAPH_TYPE* graph, UINT_t startVertex, UINT_t * level, bool* visited) {
 
-    // Initialize parents array to -1 (unvisited)
-    for (UINT_t i = 0; i < graph->numVertices; i++) {
-        parents[i] = -1;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t* frontier = (UINT_t*)malloc(n * sizeof(UINT_t));
+  assert_malloc(frontier);
+  UINT_t* next = (UINT_t*)malloc(n * sizeof(UINT_t));
+  assert_malloc(next);
+
+  UINT_t frontierSize = 0, nextSize = 0;
+    
+  // Set the initial frontier to vertex startVertex
+  frontier[frontierSize++] = startVertex;
+  level[startVertex] = 0;
+
+  while (frontierSize > 0) {
+    UINT_t numEdgesFrontier = 0; // Number of edges in the frontier
+    for (UINT_t i = 0; i < frontierSize; i++) {
+      UINT_t v = frontier[i];
+      numEdgesFrontier += Ap[v + 1] - Ap[v];
     }
 
-    // Start regular BFS from vertex 0
-    bfs(graph, 0, parents);
-
-    // Set the initial frontier to vertex 0
-    frontier[frontierSize++] = 0;
-
-    while (frontierSize > 0) {
-        UINT_t numEdgesFrontier = 0; // Number of edges in the frontier
-        for (UINT_t i = 0; i < frontierSize; i++) {
-            UINT_t v = frontier[i];
-            numEdgesFrontier += graph->rowPtr[v + 1] - graph->rowPtr[v];
-        }
-
-        UINT_t numEdgesUnexplored = 0; // Number of edges to check from unexplored vertices
-        for (UINT_t v = 0; v < graph->numVertices; v++) {
-            if (parents[v] == -1) {
-                numEdgesUnexplored += graph->rowPtr[v + 1] - graph->rowPtr[v];
-            }
-        }
-
-        if (numEdgesFrontier > numEdgesUnexplored / ALPHA) {
-            // Use bottom-up approach
-            bottom_up_step(frontier, next, parents, graph, frontierSize);
-            printf("USING: bottom_up_step\n");
-        } else {
-            // Use top-down approach
-            for (UINT_t i = 0; i < frontierSize; i++) {
-                top_down_step(&frontier[i], next, parents, graph, frontierSize);
-                printf("USING: top_down_step\n");
-            }
-        }
-
-        // Swap frontier and next arrays for the next iteration
-        UINT_t* temp = frontier;
-        frontier = next;
-        next = temp;
-        frontierSize = nextSize;
-        nextSize = 0; // Reset nextSize for the next iteration
-
-        if (frontierSize <= graph->numVertices / BETA) {
-            // Switch back to regular BFS if the frontier becomes small
-            bfs(graph, 0, parents);
-
-            // Set the initial frontier to vertex 0
-            frontier[frontierSize++] = 0;
-        }
+    UINT_t numEdgesUnexplored = 0; // Number of edges to check from unexplored vertices
+    for (UINT_t v = 0; v < n; v++) {
+      if (!visited[v]) {
+	numEdgesUnexplored += Ap[v + 1] - Ap[v];
+      }
     }
 
-    free(frontier);
-    free(next);
+    if (numEdgesFrontier > numEdgesUnexplored / ALPHA) {
+      // Use bottom-up approach
+      bottom_up_step(frontier, next, visited, graph, frontierSize, level);
+      printf("USING: bottom_up_step\n");
+    } else {
+      // Use top-down approach
+      for (UINT_t i = 0; i < frontierSize; i++) {
+	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+	printf("USING: top_down_step\n");
+      }
+    }
+
+    // Swap frontier and next arrays for the next iteration
+    UINT_t* temp = frontier;
+    frontier = next;
+    next = temp;
+    frontierSize = nextSize;
+    nextSize = 0; // Reset nextSize for the next iteration
+    
+    if (frontierSize <= n / BETA) {
+      for (UINT_t i = 0; i < frontierSize; i++) {
+	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+	printf("USING: top_down_step\n");
+      }
+    }
+  }
+
+  free(frontier);
+  free(next);
 }

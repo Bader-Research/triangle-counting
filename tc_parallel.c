@@ -570,7 +570,11 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
 
   for (UINT_t v = 0 ; v < n ; v++) {
     if (!visited[v])
+ #if 0
       bfs_visited(graph, v, level, visited);
+#else
+      bfs_hybrid_visited(graph, v, level, visited);
+#endif
   }
 
   c1 = 0; c2 = 0;
