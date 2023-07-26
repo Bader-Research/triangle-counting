@@ -453,3 +453,80 @@ UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, co
 
   return count;
 }
+
+
+void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
+  bool *visited = (bool *)calloc(graph->numVertices, sizeof(bool));
+  assert_malloc(visited);
+
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = true;
+  enqueue(queue, startVertex);
+  level[startVertex] = 0;
+  
+  while (!isEmpty(queue)) {
+    UINT_t v = dequeue(queue);
+    for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
+      UINT_t w = graph->colInd[i];
+      if (!visited[w])  {
+	visited[w] = true;
+	enqueue(queue, w);
+	level[w] = level[v] + 1;
+      }
+    }
+  }
+
+  free(visited);
+  free_queue(queue);
+}
+
+void bfs_visited(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool *visited) {
+
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = true;
+  enqueue(queue, startVertex);
+  level[startVertex] = 0;
+  
+  while (!isEmpty(queue)) {
+    UINT_t v = dequeue(queue);
+    for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
+      UINT_t w = graph->colInd[i];
+      if (!visited[w])  {
+	visited[w] = true;
+	enqueue(queue, w);
+	level[w] = level[v] + 1;
+      }
+    }
+  }
+
+  free_queue(queue);
+}
+
+void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited, bool* horiz) {
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+
+  visited[startVertex] = true;
+  enqueue(queue, startVertex);
+  level[startVertex] = 1;
+  
+  while (!isEmpty(queue)) {
+    UINT_t v = dequeue(queue);
+    for (UINT_t i = Ap[v]; i < Ap[v + 1]; i++) {
+      UINT_t w = Ai[i];
+      if (!visited[w])  {
+	horiz[i] = false;
+	visited[w] = true;
+	enqueue(queue, w);
+	level[w] = level[v] + 1;
+      }
+      else {
+	horiz[i] = (level[w] == 0) || (level[w] == level[v]);
+      }
+    }
+  }
+}
+
+

@@ -1,6 +1,8 @@
 #ifndef _GRAPH_H
 #define _GRAPH_H
 
+#include "queue.h"
+
 void print_graph(const GRAPH_TYPE*, FILE*);
 void convert_edges_to_graph(const edge_t*, GRAPH_TYPE*);
 void copy_graph(const GRAPH_TYPE *, GRAPH_TYPE *);
@@ -18,6 +20,9 @@ UINT_t intersectSizeBinarySearch(const GRAPH_TYPE*, const UINT_t, const UINT_t);
 UINT_t searchLists_with_partitioning(const UINT_t*, const INT_t, const INT_t, const UINT_t*, const INT_t, const INT_t);
 UINT_t intersectSizeHash(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t);
 
+void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
+void bfs_visited(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);
+void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t* restrict, Queue*, bool*, bool*);
 
 #endif
 

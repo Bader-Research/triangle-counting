@@ -15,6 +15,8 @@ UINT_t tc_intersectPartition_P(const GRAPH_TYPE *);
 UINT_t tc_intersectPartition_DO_P(const GRAPH_TYPE *);
 UINT_t tc_intersectHash_P(const GRAPH_TYPE *);
 UINT_t tc_intersectHash_DO_P(const GRAPH_TYPE *);
+UINT_t tc_bader_bfs1_P(const GRAPH_TYPE *);
+UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *);
 
   
 #endif

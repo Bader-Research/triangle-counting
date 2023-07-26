@@ -4,9 +4,6 @@
 #include "tc.h"
 
 
-static void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
-static void bfs_mark_horizontal_edges(const GRAPH_TYPE *, const UINT_t, UINT_t*, Queue*, bool*, bool*);
-
 
 /* Algorithm from
    T. A. Davis, "Graph algorithms via SuiteSparse: GraphBLAS: triangle counting and K-truss," 2018 IEEE High Performance extreme Computing Conference (HPEC), Waltham, MA, USA, 2018, pp. 1-6, doi: 10.1109/HPEC.2018.8547538.
@@ -1078,32 +1075,6 @@ UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
 }
 
 
-// Function to perform breadth-first search
-static void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
-  bool *visited = (bool *)calloc(graph->numVertices, sizeof(bool));
-  assert_malloc(visited);
-
-  Queue *queue = createQueue(graph->numVertices);
-
-  visited[startVertex] = true;
-  enqueue(queue, startVertex);
-  level[startVertex] = 0;
-  
-  while (!isEmpty(queue)) {
-    UINT_t v = dequeue(queue);
-    for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
-      UINT_t w = graph->colInd[i];
-      if (!visited[w])  {
-	visited[w] = true;
-	enqueue(queue, w);
-	level[w] = level[v] + 1;
-      }
-    }
-  }
-
-  free(visited);
-  free_queue(queue);
-}
 
 static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited) {
   const UINT_t *restrict Ap = graph->rowPtr;
@@ -1121,31 +1092,6 @@ static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t
 	visited[w] = true;
 	enqueue(queue, w);
 	level[w] = level[v] + 1;
-      }
-    }
-  }
-}
-
-static void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited, bool* horiz) {
-  const UINT_t *restrict Ap = graph->rowPtr;
-  const UINT_t *restrict Ai = graph->colInd;
-
-  visited[startVertex] = true;
-  enqueue(queue, startVertex);
-  level[startVertex] = 1;
-  
-  while (!isEmpty(queue)) {
-    UINT_t v = dequeue(queue);
-    for (UINT_t i = Ap[v]; i < Ap[v + 1]; i++) {
-      UINT_t w = Ai[i];
-      if (!visited[w])  {
-	horiz[i] = false;
-	visited[w] = true;
-	enqueue(queue, w);
-	level[w] = level[v] + 1;
-      }
-      else {
-	horiz[i] = (level[w] == 0) || (level[w] == level[v]);
       }
     }
   }
