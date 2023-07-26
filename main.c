@@ -4,7 +4,11 @@
 #include "tc.h"
 #ifdef PARALLEL
 #include "tc_parallel.h"
+#ifdef __APPLE__
+#include "/opt/homebrew/Cellar/libomp/16.0.6/include/omp.h"
+#else
 #include <omp.h>
+#endif
 #endif
 
 #define DEFAULT_SCALE  10
