@@ -15,6 +15,15 @@
 #define SCALE_MIN       6
 #define DEBUG           0
 
+bool QUIET  = false;
+bool PRINT  = false;
+bool NCUBED = true;
+
+#ifdef PARALLEL
+bool PARALLEL_MAX = false;
+int  PARALLEL_PROCS = 0;
+#endif
+
 
 static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *, GRAPH_TYPE *, const char *);
 #ifdef PARALLEL
@@ -49,7 +58,6 @@ static void parseFlags(int argc, char **argv) {
 
   if (argc < 1) usage();
   infile = NULL;
-  QUIET = 0;
 
   while ((argc > 1) && (argv[1][0] == '-')) {
 
@@ -89,13 +97,13 @@ static void parseFlags(int argc, char **argv) {
       break;
 
     case 'q':
-      QUIET = 1;
+      QUIET = true;
       argv++;
       argc--;
       break;
 	
     case 'd':
-      PRINT = 1;
+      PRINT = true;
       argv++;
       argc--;
       break;
@@ -116,7 +124,7 @@ static void parseFlags(int argc, char **argv) {
 #endif
 	
     case 'x':
-      NCUBED = 0;
+      NCUBED = false;
       argv++;
       argc--;
       break;
@@ -418,6 +426,7 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_intersectHash_DO_P, originalGraph, graph, "tc_intersect_Hash_DO_P");
   benchmarkTC_P(tc_bader_bfs1_P, originalGraph, graph, "tc_bader_bfs1_P");
   benchmarkTC_P(tc_bader_bfs3_P, originalGraph, graph, "tc_bader_bfs3_P");
+  benchmarkTC_P(tc_bader_bfs_hybrid_P, originalGraph, graph, "tc_bader_bfs_hybrid_P");
   if (NCUBED)
     benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");
   if (NCUBED)

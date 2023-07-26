@@ -13,35 +13,23 @@ WARN =
 #WARN = -Wall
 
 # GCC
-CC 	= gcc
-CFLAGS1 = -DGCC $(PARALLEL) $(WARN)
-CFLAGS2 = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O2
-CFLAGS3 = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O3
+CC     = gcc
+CFLAGS = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O2
 
 # Intel ICX
-#CC      = icx
-#CFLAGS1 = -DICX -DPARALLEL $(WARN)
-#CFLAGS2 = -DICX -DPARALLEL $(WARN) -O2
-#CFLAGS3 = -DICX -DPARALLEL $(WARN) -O3
+#CC     = icx
+#CFLAGS = -DICX -DPARALLEL $(WARN) -O2
 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
 
-#all: tc tcO2 tcO3
-all: tcO2
+all: tc
 
 %.o: %.c
-	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -c $< -o $@
+	${CC} ${CFLAGS} ${OPTS} -c $< -o $@
 
 tc: $(OBJS)
-	${CC} ${CFLAGS} ${CFLAGS1} ${OPTS} -o $@ $(OBJS) -lm
-
-tcO2: $(OBJS)
-	${CC} ${CFLAGS} ${CFLAGS2} ${OPTS} -o $@ $(OBJS) -lm
-
-tcO3: $(OBJS)
-	${CC} ${CFLAGS} ${CFLAGS3} ${OPTS} -o $@ $(OBJS) -lm
+	${CC} ${CFLAGS} ${OPTS} -o $@ $(OBJS) -lm
 
 clean: 
-	rm -f core *~ $(OBJS) \
-	tc tcO2 tcO3
+	rm -f core *~ $(OBJS) tc

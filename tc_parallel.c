@@ -5,7 +5,6 @@
 #include "tc_parallel.h"
 #include <omp.h>
 
-
 int get_num_threads() {
   int numThreads;
 #pragma omp parallel
@@ -536,7 +535,7 @@ UINT_t tc_bader_bfs1_P(const GRAPH_TYPE *graph) {
 }
 
 
-UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
+static UINT_t tc_bader_bfs_core_P(const GRAPH_TYPE* graph, void (*f)(const GRAPH_TYPE*, const UINT_t, UINT_t *, bool *)) {
   /* Bader's new algorithm for triangle counting based on BFS */
   /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
   /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
@@ -546,6 +545,7 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
   UINT_t c1, c2;
   bool *Hash;
   bool *visited;
+
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;
   const UINT_t n = graph->numVertices;
@@ -570,11 +570,7 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
 
   for (UINT_t v = 0 ; v < n ; v++) {
     if (!visited[v])
- #if 0
-      bfs_visited(graph, v, level, visited);
-#else
-      bfs_hybrid_visited(graph, v, level, visited);
-#endif
+      (*f)(graph, v, level, visited);
   }
 
   c1 = 0; c2 = 0;
@@ -627,6 +623,13 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
+  return tc_bader_bfs_core_P(graph, bfs_visited);
+}
+
+UINT_t tc_bader_bfs_hybrid_P(const GRAPH_TYPE *graph) {
+  return tc_bader_bfs_core_P(graph, bfs_hybrid_visited);
+}
 
 #endif
 

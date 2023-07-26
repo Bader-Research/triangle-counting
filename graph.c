@@ -616,7 +616,7 @@ void bottom_up_step(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH_T
 //    return tree
 
 // frontier - vertices that considered for exploration
-void bfs_hybrid_visited(const GRAPH_TYPE* graph, UINT_t startVertex, UINT_t * level, bool* visited) {
+void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t * level, bool* visited) {
 
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
@@ -651,12 +651,16 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, UINT_t startVertex, UINT_t * le
     if (numEdgesFrontier > numEdgesUnexplored / ALPHA) {
       // Use bottom-up approach
       bottom_up_step(frontier, next, visited, graph, frontierSize, level);
+#if 0
       printf("USING: bottom_up_step\n");
+#endif
     } else {
       // Use top-down approach
       for (UINT_t i = 0; i < frontierSize; i++) {
 	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+#if 0
 	printf("USING: top_down_step\n");
+#endif
       }
     }
 
@@ -670,7 +674,9 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, UINT_t startVertex, UINT_t * le
     if (frontierSize <= n / BETA) {
       for (UINT_t i = 0; i < frontierSize; i++) {
 	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+#if 0
 	printf("USING: top_down_step\n");
+#endif
       }
     }
   }

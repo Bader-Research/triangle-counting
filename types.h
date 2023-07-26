@@ -53,13 +53,13 @@ static void assert_malloc(const void *ptr) {
     }
 }
 
-static int QUIET;
-static int PRINT = 0;
-static int NCUBED = 1;
+extern bool QUIET;
+extern bool PRINT;
+extern bool NCUBED;
 
 #ifdef PARALLEL
-static bool PARALLEL_MAX = false;
-static int  PARALLEL_PROCS = 0;
+extern bool PARALLEL_MAX;
+extern int  PARALLEL_PROCS;
 #endif
 
 #ifdef GCC
