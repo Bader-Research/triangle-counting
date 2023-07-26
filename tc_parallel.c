@@ -5,6 +5,7 @@
 #include "tc_parallel.h"
 #include <omp.h>
 
+
 int get_num_threads() {
   int numThreads;
 #pragma omp parallel
