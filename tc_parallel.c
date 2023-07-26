@@ -3,8 +3,11 @@
 #include "types.h"
 #include "graph.h"
 #include "tc_parallel.h"
+#ifdef __APPLE__
+#include "/opt/homebrew/Cellar/libomp/16.0.6/include/omp.h"
+#else
 #include <omp.h>
-
+#endif
 
 int get_num_threads() {
   int numThreads;
