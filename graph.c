@@ -458,6 +458,36 @@ UINT_t intersectSizeHash(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, co
 }
 
 
+UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+  register UINT_t vb, ve, wb, we;
+  register UINT_t ptr_v, ptr_w;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+  
+  vb = Ap[v  ];
+  ve = vb + Size[v];
+  wb = Ap[w  ];
+  we = wb + Size[w];
+
+  ptr_v = vb;
+  ptr_w = wb;
+  while ((ptr_v < ve) && (ptr_w < we)) {
+    if (A[ptr_v] == A[ptr_w]) {
+      count++;
+      ptr_v++;
+      ptr_w++;
+    }
+    else
+      if (A[ptr_v] < A[ptr_w])
+	ptr_v++;
+      else
+	ptr_w++;
+  }
+  return count;
+}
+
+
 void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
   bool *visited = (bool *)calloc(graph->numVertices, sizeof(bool));
   assert_malloc(visited);
@@ -684,3 +714,4 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_
   free(frontier);
   free(next);
 }
+
