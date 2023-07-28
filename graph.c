@@ -714,7 +714,6 @@ void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex
 //            end for
 //        end for
 
-
 void top_down_step(UINT_t* frontier, UINT_t* next, bool* visited, const GRAPH_TYPE* graph, UINT_t frontier_size, UINT_t *level) {
 
   const UINT_t n = graph->numVertices;
@@ -735,6 +734,7 @@ void top_down_step(UINT_t* frontier, UINT_t* next, bool* visited, const GRAPH_TY
     }
   }
 }
+
 //
 //    function bottom-up-step(frontier, next, parents)
 //        for v ∈ vertices do
@@ -825,12 +825,10 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_
 #endif
     } else {
       // Use top-down approach
-      for (UINT_t i = 0; i < frontierSize; i++) {
-	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+      top_down_step(frontier, next, visited, graph, frontierSize, level);
 #if 0
 	printf("USING: top_down_step\n");
 #endif
-      }
     }
 
     // Swap frontier and next arrays for the next iteration
@@ -841,12 +839,10 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_
     nextSize = 0; // Reset nextSize for the next iteration
     
     if (frontierSize <= n / BETA) {
-      for (UINT_t i = 0; i < frontierSize; i++) {
-	top_down_step(&frontier[i], next, visited, graph, frontierSize, level);
+      top_down_step(frontier, next, visited, graph, frontierSize, level);
 #if 0
 	printf("USING: top_down_step\n");
 #endif
-      }
     }
   }
 
@@ -854,3 +850,106 @@ void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_
   free(next);
 }
 
+#ifdef PARALLEL
+
+void top_down_step_P(UINT_t* frontier, UINT_t* next, bool* visited, const GRAPH_TYPE* graph, UINT_t frontier_size, UINT_t *level) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t next_size = 0; // track number of elements in the next array
+#pragma omp parallel for
+  for (UINT_t i = 0; i < frontier_size; i++) {
+    UINT_t v = frontier[i];
+    for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+      UINT_t w = Ai[j];
+      if (!visited[w]) {
+	visited[w] = true;
+	level[w] = level[v] + 1;
+	next[next_size++] = w;
+      }
+    }
+  }
+}
+
+void bottom_up_step_P(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH_TYPE* graph, UINT_t frontier_size, UINT_t *level) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t next_size = 0;
+#pragma omp parallel for
+  for (UINT_t i = 0; i < frontier_size; i++) {
+    UINT_t v = frontier[i];
+    if (!visited[v]) {
+      for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+	UINT_t w = Ai[j];
+	if (w == frontier[j]) {
+	  visited[v] = true;
+	  level[v] = level[w] + 1;
+	  next[next_size++] = v;
+	  break;
+	}
+      }
+    }
+  }
+}
+
+void bfs_hybrid_visited_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t * level, bool* visited) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  UINT_t* frontier = (UINT_t*)malloc(n * sizeof(UINT_t));
+  assert_malloc(frontier);
+  UINT_t* next = (UINT_t*)malloc(n * sizeof(UINT_t));
+  assert_malloc(next);
+
+  UINT_t frontierSize = 0, nextSize = 0;
+    
+  // Set the initial frontier to vertex startVertex
+  frontier[frontierSize++] = startVertex;
+  level[startVertex] = 0;
+
+  while (frontierSize > 0) {
+    UINT_t numEdgesFrontier = 0; // Number of edges in the frontier    
+    for (UINT_t i = 0; i < frontierSize; i++) {
+      UINT_t v = frontier[i];
+      numEdgesFrontier += Ap[v + 1] - Ap[v];
+    }
+
+    UINT_t numEdgesUnexplored = 0; // Number of edges to check from unexplored vertices
+    for (UINT_t v = 0; v < n; v++) {
+      if (!visited[v]) {
+	numEdgesUnexplored += Ap[v + 1] - Ap[v];
+      }
+    }
+
+    if (numEdgesFrontier > numEdgesUnexplored / ALPHA) {
+      bottom_up_step_P(frontier, next, visited, graph, frontierSize, level);
+    } else {
+      top_down_step_P(frontier, next, visited, graph, frontierSize, level);
+    }
+
+    // Swap frontier and next arrays for the next iteration
+    UINT_t* temp = frontier;
+    frontier = next;
+    next = temp;
+    frontierSize = nextSize;
+    nextSize = 0; // Reset nextSize for the next iteration
+    
+    if (frontierSize <= n / BETA) {
+      top_down_step_P(frontier, next, visited, graph, frontierSize, level);
+    }
+  }
+
+  free(frontier);
+  free(next);
+}
+#endif

@@ -19,6 +19,7 @@ UINT_t tc_forward_hash_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs1_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs_hybrid_P(const GRAPH_TYPE *);
+UINT_t tc_bader_bfs_hybrid2_P(const GRAPH_TYPE *);
 
   
 #endif
