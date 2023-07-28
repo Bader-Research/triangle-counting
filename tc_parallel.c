@@ -666,32 +666,12 @@ UINT_t tc_bader_bfs_hybrid_P(const GRAPH_TYPE *graph) {
 }
 
 
-void acquire_locks(omp_lock_t* locks, UINT_t v1, UINT_t v2) {
-  bool locks_set = false;
-  
-  while (!locks_set) {
-    omp_set_lock(&locks[v1]);
-    if (omp_test_lock(&locks[v2])) {
-      locks_set = true;
-    }
-    else {
-      omp_unset_lock(&locks[v1]);
-      usleep(50);
-    }
-  }
-  return;
-}
-
-void release_locks(omp_lock_t* locks, UINT_t v1, UINT_t v2) {
-  omp_unset_lock(&locks[v1]);
-  omp_unset_lock(&locks[v2]);
-  return;
-}
-
-UINT_t tc_forward_P(const GRAPH_TYPE *graph) {
+UINT_t tc_forward_hash_P(const GRAPH_TYPE *graph) {
   
 /* Schank, T., Wagner, D. (2005). Finding, Counting and Listing All Triangles in Large Graphs, an Experimental Study. In: Nikoletseas, S.E. (eds) Experimental and Efficient Algorithms. WEA 2005. Lecture Notes in Computer Science, vol 3503. Springer, Berlin, Heidelberg. https://doi.org/10.1007/11427186_54 */
 
+  register UINT_t s, t;
+  register UINT_t b, e;
   UINT_t count = 0;
 
   const UINT_t* restrict Ap = graph->rowPtr;
@@ -699,57 +679,31 @@ UINT_t tc_forward_P(const GRAPH_TYPE *graph) {
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
 
+  bool* Hash = (bool *)calloc(m, sizeof(bool));
+  assert_malloc(Hash);
+
   UINT_t* Size = (UINT_t *)calloc(n, sizeof(UINT_t));
   assert_malloc(Size);
   
   UINT_t* A = (UINT_t *)calloc(m, sizeof(UINT_t));
   assert_malloc(A);
 
-  omp_lock_t *vLock = (omp_lock_t *)malloc(n * sizeof(omp_lock_t));
-  assert_malloc(vLock);
-  for (UINT_t i = 0 ; i < n ; i++)
-    omp_init_lock(&vLock[i]);
-  
-  static int numThreads;
-  static UINT_t *mycount;
-
-#pragma omp parallel
-  {
-    int myID = omp_get_thread_num();
-    if (myID==0) {
-      numThreads = omp_get_num_threads();
-      
-      mycount = (UINT_t *)calloc(numThreads, sizeof(UINT_t));
-      assert_malloc(mycount);
-    }
-#pragma omp barrier
-#pragma omp for schedule(dynamic)
-    for (UINT_t s = 0; s < n ; s++) {
-      UINT_t b = Ap[s  ];
-      UINT_t e = Ap[s+1];
-      for (UINT_t i=b ; i<e ; i++) {
-	UINT_t t  = Ai[i];
-	if (s<t) {
-	  acquire_locks(vLock, s, t);
-	  mycount[myID] += intersectSizeMergePath_forward(graph, s, t, A, Size);
-	  A[Ap[t] + Size[t]] = s;
-	  Size[t]++;
-	  release_locks(vLock, s, t);
-	}
+  for (s = 0; s < n ; s++) {
+    b = Ap[s  ];
+    e = Ap[s+1];
+    for (UINT_t i=b ; i<e ; i++) {
+      t  = Ai[i];
+      if (s<t) {
+	count += intersectSizeHash_forward_P(graph, Hash, s, t, A, Size);
+	A[Ap[t] + Size[t]] = s;
+	Size[t]++;
       }
     }
-
-#pragma omp for reduction(+:count)
-    for (int i = 0; i < numThreads ; i++)
-      count += mycount[i];
   }
 
-  for (UINT_t i = 0 ; i < n ; i++)
-    omp_destroy_lock(&vLock[i]);
-
-  free(vLock);
   free(A);
   free(Size);
+  free(Hash);
   
   return count;
 }

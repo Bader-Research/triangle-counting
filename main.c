@@ -424,10 +424,10 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_intersectPartition_DO_P, originalGraph, graph, "tc_intersect_Partition_DO_P");
   benchmarkTC_P(tc_intersectHash_P, originalGraph, graph, "tc_intersect_Hash_P");
   benchmarkTC_P(tc_intersectHash_DO_P, originalGraph, graph, "tc_intersect_Hash_DO_P");
-  //  benchmarkTC_P(tc_forward_P, originalGraph, graph, "tc_forward_P");
   benchmarkTC_P(tc_bader_bfs1_P, originalGraph, graph, "tc_bader_bfs1_P");
   benchmarkTC_P(tc_bader_bfs3_P, originalGraph, graph, "tc_bader_bfs3_P");
   benchmarkTC_P(tc_bader_bfs_hybrid_P, originalGraph, graph, "tc_bader_bfs_hybrid_P");
+  benchmarkTC_P(tc_forward_hash_P, originalGraph, graph, "tc_forward_hash_P");
   if (NCUBED)
     benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");
   if (NCUBED)

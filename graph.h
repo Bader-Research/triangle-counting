@@ -21,6 +21,12 @@ UINT_t searchLists_with_partitioning(const UINT_t*, const INT_t, const INT_t, co
 UINT_t intersectSizeHash(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t);
 
 UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE*, const UINT_t, const UINT_t, const UINT_t*, const UINT_t*);
+UINT_t intersectSizeHash_forward(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t, const UINT_t*, const UINT_t*);
+#ifdef PARALLEL
+UINT_t intersectSizeHash_forward_P(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t, const UINT_t*, const UINT_t*);
+#endif
+UINT_t intersectSizeHashSkip_forward(const GRAPH_TYPE *, bool *, const UINT_t, const UINT_t, const UINT_t*, const UINT_t*);
+
 
 void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
 void bfs_visited(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);

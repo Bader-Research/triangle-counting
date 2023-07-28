@@ -1,5 +1,8 @@
 #include "types.h"
 #include "graph.h"
+#ifdef PARALLEL
+#include "omp.h"
+#endif
 
 #define ALPHA 14.0
 #define BETA 24.0
@@ -486,6 +489,142 @@ UINT_t intersectSizeMergePath_forward(const GRAPH_TYPE* graph, const UINT_t v, c
   }
   return count;
 }
+
+UINT_t intersectSizeHash_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+
+  register UINT_t vb, ve, wb, we;
+  register UINT_t s1, e1, s2, e2;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+
+  vb = Ap[v  ];
+  ve = vb + Size[v];
+  wb = Ap[w  ];
+  we = wb + Size[w];
+
+  if (Size[v] < Size[w]) {
+    s1 = vb;
+    e1 = ve;
+    s2 = wb;
+    e2 = we;
+  } else {
+    s1 = wb;
+    e1 = we;
+    s2 = vb;
+    e2 = ve;
+  }
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = true;
+
+  for (UINT_t i= s2; i<e2 ; i++)
+    if (Hash[A[i]]) count++;
+  
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = false;
+    
+  return count;
+}
+
+#ifdef PARALLEL
+UINT_t intersectSizeHash_forward_P(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+
+  register UINT_t vb, ve, wb, we;
+  register UINT_t s1, e1, s2, e2;
+  UINT_t count = 0;
+  int numThreads;
+  UINT_t *mycount;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+
+  vb = Ap[v  ];
+  ve = vb + Size[v];
+  wb = Ap[w  ];
+  we = wb + Size[w];
+
+  if (Size[v] < Size[w]) {
+    s1 = vb;
+    e1 = ve;
+    s2 = wb;
+    e2 = we;
+  } else {
+    s1 = wb;
+    e1 = we;
+    s2 = vb;
+    e2 = ve;
+  }
+
+#pragma omp parallel
+  {
+
+    int myID = omp_get_thread_num();
+    if (myID==0) {
+      numThreads = omp_get_num_threads();
+      
+      mycount = (UINT_t *)calloc(numThreads, sizeof(UINT_t));
+      assert_malloc(mycount);
+    }
+#pragma omp barrier
+#pragma omp for
+    for (UINT_t i=s1 ; i<e1 ; i++)
+      Hash[A[i]] = true;
+
+#pragma omp for
+    for (UINT_t i= s2; i<e2 ; i++)
+      if (Hash[A[i]]) mycount[myID]++;
+  
+#pragma omp for
+    for (UINT_t i=s1 ; i<e1 ; i++) 
+      Hash[A[i]] = false;
+
+#pragma omp for reduction(+:count)
+    for (int i = 0; i < numThreads ; i++)
+      count += mycount[i];
+
+  }
+
+  free(mycount);
+    
+  return count;
+}
+#endif
+
+
+UINT_t intersectSizeHashSkip_forward(const GRAPH_TYPE *graph, bool *Hash, const UINT_t v, const UINT_t w, const UINT_t* A, const UINT_t* Size) {
+
+  register UINT_t s1, e1, s2, e2;
+  UINT_t count = 0;
+
+  const UINT_t* restrict Ap = graph->rowPtr;
+
+  if (Size[v] < Size[w]) {
+    if (Size[v] == 0) return 0;
+    s1 = Ap[v  ];
+    e1 = s1 + Size[v];
+    s2 = Ap[w  ];
+    e2 = s2 + Size[w];
+  } else {
+    if (Size[w] == 0) return 0;
+    s1 = Ap[w  ];
+    e1 = s1 + Size[w];
+    s2 = Ap[v  ];
+    e2 = s2 + Size[v];
+  }
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = true;
+
+  for (UINT_t i=s2 ; i<e2 ; i++)
+    if (Hash[A[i]]) count++;
+
+  for (UINT_t i=s1 ; i<e1 ; i++)
+    Hash[A[i]] = false;
+
+  return count;
+}
+
+
 
 
 void bfs(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level) {
