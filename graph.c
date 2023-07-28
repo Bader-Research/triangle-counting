@@ -860,15 +860,18 @@ void top_down_step_P(UINT_t* frontier, UINT_t* next, bool* visited, const GRAPH_
   UINT_t* Ai = graph->colInd;
 
   UINT_t next_size = 0; // track number of elements in the next array
-#pragma omp parallel for
-  for (UINT_t i = 0; i < frontier_size; i++) {
-    UINT_t v = frontier[i];
-    for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
-      UINT_t w = Ai[j];
-      if (!visited[w]) {
-	visited[w] = true;
-	level[w] = level[v] + 1;
-	next[next_size++] = w;
+#pragma omp parallel
+  {
+#pragma omp for schedule(dynamic)
+    for (UINT_t i = 0; i < frontier_size; i++) {
+      UINT_t v = frontier[i];
+      for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+	UINT_t w = Ai[j];
+	if (!visited[w]) {
+	  visited[w] = true;
+	  level[w] = level[v] + 1;
+	  next[next_size++] = w;
+	}
       }
     }
   }
@@ -882,17 +885,20 @@ void bottom_up_step_P(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH
   UINT_t* Ai = graph->colInd;
 
   UINT_t next_size = 0;
-#pragma omp parallel for
-  for (UINT_t i = 0; i < frontier_size; i++) {
-    UINT_t v = frontier[i];
-    if (!visited[v]) {
-      for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
-	UINT_t w = Ai[j];
-	if (w == frontier[j]) {
-	  visited[v] = true;
-	  level[v] = level[w] + 1;
-	  next[next_size++] = v;
-	  break;
+#pragma omp parallel
+  {
+#pragma omp for schedule(dynamic)
+    for (UINT_t i = 0; i < frontier_size; i++) {
+      UINT_t v = frontier[i];
+      if (!visited[v]) {
+	for (UINT_t j = Ap[v]; j < Ap[v + 1]; j++) {
+	  UINT_t w = Ai[j];
+	  if (w == frontier[j]) {
+	    visited[v] = true;
+	    level[v] = level[w] + 1;
+	    next[next_size++] = v;
+	    break;
+	  }
 	}
       }
     }
