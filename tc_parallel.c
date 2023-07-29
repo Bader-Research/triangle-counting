@@ -669,6 +669,10 @@ UINT_t tc_bader_bfs_hybrid2_P(const GRAPH_TYPE *graph) {
   return tc_bader_bfs_core_P(graph, bfs_hybrid_visited_P);
 }
 
+UINT_t tc_bader_bfs_chatgpt_P(const GRAPH_TYPE *graph) {
+  return tc_bader_bfs_core_P(graph, bfs_chatgpt_P);
+}
+
 
 UINT_t tc_forward_hash_P(const GRAPH_TYPE *graph) {
   
