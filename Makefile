@@ -1,6 +1,6 @@
 
 # build options
-#OPTS = -DLOOP_CNT=1
+# OPTS = -DLOOP_CNT=1
 
 # Turn off/on OpenMP parallel code
 #PARALLEL = 
@@ -18,7 +18,7 @@ CFLAGS = -DGCC $(PARALLEL) $(WARN) -funroll-loops -funroll-all-loops -O2
 
 # Intel ICX
 #CC     = icx
-#CFLAGS = -DICX -DPARALLEL $(WARN) -O2
+#CFLAGS = -DICX $(PARALLEL) $(WARN) -O2
 
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
