@@ -429,6 +429,7 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_bader_bfs_hybrid_P, originalGraph, graph, "tc_bader_bfs_hybrid_P");
   benchmarkTC_P(tc_bader_bfs_hybrid2_P, originalGraph, graph, "tc_bader_bfs_hybrid2_P");
   benchmarkTC_P(tc_bader_bfs_chatgpt_P, originalGraph, graph, "tc_bader_bfs_chatgpt_P");
+  benchmarkTC_P(tc_MapJIK_P, originalGraph, graph, "tc_MapJIK_P");
   benchmarkTC_P(tc_forward_hash_P, originalGraph, graph, "tc_forward_hash_P");
   if (NCUBED)
     benchmarkTC_P(tc_triples_P, originalGraph, graph, "tc_triples_P");

@@ -21,6 +21,7 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs_hybrid_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs_hybrid2_P(const GRAPH_TYPE *);
 UINT_t tc_bader_bfs_chatgpt_P(const GRAPH_TYPE *);
+UINT_t tc_MapJIK_P(const GRAPH_TYPE *);
 
   
 #endif
