@@ -785,7 +785,7 @@ void bottom_up_step(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH_T
 //    return tree
 
 // frontier - vertices that considered for exploration
-void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t * level, bool* visited) {
+void bfs_hybrid_visited(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
 
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
@@ -899,7 +899,7 @@ void bottom_up_step_P(UINT_t* frontier, UINT_t* next, bool *visited, const GRAPH
   }
 }
 
-void bfs_hybrid_visited_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t * level, bool* visited) {
+void bfs_hybrid_visited_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
 
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;
@@ -966,7 +966,7 @@ void bfs_hybrid_visited_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UIN
 
 
 
-void bfs_chatgpt_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t *level, bool* visited) {
+void bfs_chatgpt_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
 
   const UINT_t n = graph->numVertices;
   const UINT_t m = graph->numEdges;

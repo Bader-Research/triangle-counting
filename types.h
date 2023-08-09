@@ -58,6 +58,7 @@ extern bool PRINT;
 extern bool NCUBED;
 
 #ifdef PARALLEL
+extern bool BENCHMARK_BFS;
 extern bool PARALLEL_MAX;
 extern int  PARALLEL_PROCS;
 #endif

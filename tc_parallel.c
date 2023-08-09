@@ -492,7 +492,8 @@ UINT_t tc_bader_bfs1_P(const GRAPH_TYPE *graph) {
   static UINT_t *myc2;
 
   c1 = 0; c2 = 0;
-#pragma omp parallel
+#pragma omp parallel \
+  shared(numThreads, myc1, myc2, Hash, Ap, Ai, n, m, level)
   {
     int myID = omp_get_thread_num();
     if (myID==0) {
@@ -593,7 +594,8 @@ static UINT_t tc_bader_bfs_core_P(const GRAPH_TYPE* graph, void (*f)(const GRAPH
   static UINT_t *myc2;
 
   c1 = 0; c2 = 0;
-#pragma omp parallel
+#pragma omp parallel \
+  shared(numThreads, myc1, myc2, Hash, Ap, Ai, n, m, level)
   {
     int myID = omp_get_thread_num();
     if (myID==0) {

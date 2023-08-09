@@ -20,6 +20,7 @@ bool PRINT  = false;
 bool NCUBED = true;
 
 #ifdef PARALLEL
+bool BENCHMARK_BFS = false;
 bool PARALLEL_MAX = false;
 int  PARALLEL_PROCS = 0;
 #endif
@@ -109,6 +110,12 @@ static void parseFlags(int argc, char **argv) {
       break;
 	
 #ifdef PARALLEL
+    case 'B':
+      BENCHMARK_BFS = true;
+      argv++;
+      argc--;
+      break;
+      
     case 'P':
       PARALLEL_MAX = true;
       argv++;
@@ -183,6 +190,48 @@ static void benchmarkTC(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *origin
 }
 
 #ifdef PARALLEL
+static void benchmarkBFS(void (*f)(const GRAPH_TYPE*, const UINT_t, UINT_t*, bool*), const GRAPH_TYPE *originalGraph, const char *name) {
+  int loop, err;
+  double 
+    total_time,
+    over_time;
+  bool *visited;
+  UINT_t *level;
+  UINT_t i, n;
+
+  n = originalGraph->numVertices;
+
+  visited = (bool *)malloc(n * sizeof(bool));
+  assert_malloc(visited);
+  level = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(level);
+  
+  total_time = get_seconds();
+  for (loop=0 ; loop<LOOP_CNT ; loop++) {
+    for(i=0; i<n ; i++) {
+      visited[i] = false;
+      level[i]   = n+1;
+    }
+    for(i=0; i<n ; i++) {
+      if (!visited[i])
+	(*f)(originalGraph, i, level, visited);
+    }
+  }
+  total_time = get_seconds() - total_time;
+
+  total_time /= (double)LOOP_CNT;
+
+  fprintf(outfile,"BFS\t%s\t%12d\t%12d\t%-30s\t%9.6f\n",
+	  INFILENAME,
+	  originalGraph->numVertices, (originalGraph->numEdges)/2,
+	  name, total_time);
+  fflush(outfile);
+
+  free(level);
+  free(visited);
+}
+
+
 static void benchmarkTC_P(UINT_t (*f)(const GRAPH_TYPE*), const GRAPH_TYPE *originalGraph, GRAPH_TYPE *graph, const char *name) {
   int loop, err;
   double 
@@ -371,6 +420,15 @@ main(int argc, char **argv) {
   copy_graph(originalGraph, graph);
   numTriangles = tc_wedge(graph);
   correctTriangleCount = numTriangles;
+
+#ifdef PARALLEL
+  if (BENCHMARK_BFS) {
+    benchmarkBFS(bfs_visited, originalGraph, "bfs_visited");
+    benchmarkBFS(bfs_hybrid_visited, originalGraph, "bfs_hybrid_visited");
+    benchmarkBFS(bfs_hybrid_visited_P, originalGraph, "bfs_hybrid_visited_P");
+    benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_visited_P");
+  }
+#endif
 
   benchmarkTC(tc_wedge, originalGraph, graph, "tc_wedge");
   benchmarkTC(tc_wedge_DO, originalGraph, graph, "tc_wedge_DO");
