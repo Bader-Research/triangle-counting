@@ -773,10 +773,12 @@ GRAPH_TYPE *ptc_Preprocess(const GRAPH_TYPE *originalGraph)
   graph->numVertices = nvtxs;
   graph->numEdges = /* nvtxs+xadj[nvtxs] */ xadj[nvtxs];
   /* graph->rowPtr   = nxadj = (ssize_t *)malloc((nvtxs+1) * sizeof(ssize_t)); */
-  graph->rowPtr = nxadj = (int32_t *)malloc((nvtxs+1) * sizeof(int32_t));
-  assert_malloc(graph->rowPtr);
-  graph->colInd = nadjncy = (int32_t *)malloc((nvtxs+xadj[nvtxs]) * sizeof(int32_t));
-  assert_malloc(graph->colInd);
+  nxadj = (int32_t *)malloc((nvtxs+1) * sizeof(int32_t));
+  assert_malloc(nxadj);
+  graph->rowPtr = (UINT_t *)nxadj;
+  nadjncy = (int32_t *)malloc((nvtxs+xadj[nvtxs]) * sizeof(int32_t));
+  assert_malloc(nadjncy);
+  graph->colInd = (UINT_t *)nadjncy;
   
   perm  = (int32_t *)malloc(nvtxs * sizeof(int32_t));
   assert_malloc(perm);
