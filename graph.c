@@ -1011,6 +1011,8 @@ void bfs_chatgpt_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* le
 	    }
 #pragma omp critical
 	    {
+	      if (current_level_size >= n)
+		printf("ERROR: current_level_size: %d  n: %d\n",current_level_size,n);
 	      current_level_vertices[current_level_size++] = w;
 	    }
 	  }
@@ -1027,6 +1029,77 @@ void bfs_chatgpt_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* le
 
   }
 
+  free(current_level_vertices);
+}
+
+
+void bfs_locks_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
+
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+  UINT_t* Ap = graph->rowPtr;
+  UINT_t* Ai = graph->colInd;
+
+  visited[startVertex] = true;
+
+  UINT_t *current_level_vertices = (UINT_t *)malloc(n * sizeof(UINT_t));
+  assert_malloc(current_level_vertices);
+
+  UINT_t current_level = 0;
+  UINT_t current_level_size = 1;
+  UINT_t curStart = 0;
+  UINT_t curEnd = 1;
+
+  omp_lock_t *vlocks = (omp_lock_t *)malloc(n * sizeof(omp_lock_t));
+  assert_malloc(vlocks);
+  for (int i=0 ; i<n ; i++)
+    omp_init_lock(&vlocks[i]);
+
+#pragma omp parallel
+  {
+
+#pragma omp single
+    {
+      current_level_vertices[0] = startVertex;
+    }
+
+    while (curEnd > curStart) {
+#pragma omp for
+      for (UINT_t i = curStart; i < curEnd; i++) {
+	UINT_t v = current_level_vertices[i];
+	UINT_t s = Ap[v];
+	UINT_t e = Ap[v + 1];
+
+	for (UINT_t j = s; j < e; j++) {
+	  UINT_t w = Ai[j];
+	  omp_set_lock(&vlocks[w]);
+	  if (!visited[w]) {
+	    visited[w] = true;
+	    level[w] = current_level + 1;
+#pragma omp critical
+	    {
+	      if (current_level_size >= n)
+		printf("ERROR: current_level_size: %d  n: %d\n",current_level_size,n);
+	      current_level_vertices[current_level_size++] = w;
+	    }
+	  }
+	  omp_unset_lock(&vlocks[w]);
+	}
+      }
+
+#pragma omp single
+      {
+	current_level++;
+	curStart = curEnd;
+	curEnd = current_level_size;
+      }
+    }
+
+  }
+
+  for (int i=0 ; i<n ; i++)
+    omp_destroy_lock(&vlocks[i]);
+  free(vlocks);
   free(current_level_vertices);
 }
 

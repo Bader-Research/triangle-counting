@@ -52,6 +52,7 @@ static void usage(void) {
   printf(" -d              [Display/Print Input Graph]\n");
   printf(" -q              [Turn on Quiet mode]\n");
   printf(" -x              [Do not run N^3 algorithms]\n");
+  printf(" -B              [Benchmark BFS algorithms]\n");
   exit (8);
 }
 
@@ -221,10 +222,21 @@ static void benchmarkBFS(void (*f)(const GRAPH_TYPE*, const UINT_t, UINT_t*, boo
 
   total_time /= (double)LOOP_CNT;
 
-  fprintf(outfile,"BFS\t%s\t%12d\t%12d\t%-30s\t%9.6f\n",
-	  INFILENAME,
-	  originalGraph->numVertices, (originalGraph->numEdges)/2,
-	  name, total_time);
+  if (name[strlen(name)-1] != 'P') {
+    fprintf(outfile,"BFS\t%s\t%12d\t%12d\t%-30s\t%9.6f\n",
+	    INFILENAME,
+	    originalGraph->numVertices, (originalGraph->numEdges)/2,
+	    name, total_time);
+  }
+  else {
+#pragma omp parallel
+#pragma omp master
+    fprintf(outfile,"BFS\t%s\t%12d\t%12d\t%-30s\t%9.6f\t%12d\n",
+	    INFILENAME,
+	    originalGraph->numVertices, (originalGraph->numEdges)/2,
+	    name, total_time,
+	    omp_get_num_threads());
+  }
   fflush(outfile);
 
   free(level);
@@ -426,7 +438,9 @@ main(int argc, char **argv) {
     benchmarkBFS(bfs_visited, originalGraph, "bfs_visited");
     benchmarkBFS(bfs_hybrid_visited, originalGraph, "bfs_hybrid_visited");
     benchmarkBFS(bfs_hybrid_visited_P, originalGraph, "bfs_hybrid_visited_P");
-    benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_visited_P");
+    benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_P");
+    benchmarkBFS(bfs_locks_P, originalGraph, "bfs_locks_P");
+    goto done;
   }
 #endif
 
@@ -487,6 +501,7 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_bader_bfs_hybrid_P, originalGraph, graph, "tc_bader_bfs_hybrid_P");
   benchmarkTC_P(tc_bader_bfs_hybrid2_P, originalGraph, graph, "tc_bader_bfs_hybrid2_P");
   benchmarkTC_P(tc_bader_bfs_chatgpt_P, originalGraph, graph, "tc_bader_bfs_chatgpt_P");
+  benchmarkTC_P(tc_bader_bfs_locks_P, originalGraph, graph, "tc_bader_bfs_locks_P");
   benchmarkTC_P(tc_MapJIK_P, originalGraph, graph, "tc_MapJIK_P");
   benchmarkTC_P(tc_forward_hash_P, originalGraph, graph, "tc_forward_hash_P");
   if (NCUBED)
@@ -494,6 +509,8 @@ main(int argc, char **argv) {
   if (NCUBED)
     benchmarkTC_P(tc_triples_DO_P, originalGraph, graph, "tc_triples_DO_P");
 #endif
+
+ done:
   
   free_graph(originalGraph);
   free_graph(graph);
