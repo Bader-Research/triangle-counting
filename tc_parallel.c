@@ -663,6 +663,10 @@ UINT_t tc_bader_bfs3_P(const GRAPH_TYPE *graph) {
   return tc_bader_bfs_core_P(graph, bfs_visited);
 }
 
+UINT_t tc_bader_bfs_visited_P(const GRAPH_TYPE *graph) {
+  return tc_bader_bfs_core_P(graph, bfs_visited_P);
+}
+
 UINT_t tc_bader_bfs_hybrid_P(const GRAPH_TYPE *graph) {
   return tc_bader_bfs_core_P(graph, bfs_hybrid_visited);
 }

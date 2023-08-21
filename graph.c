@@ -676,6 +676,49 @@ void bfs_visited(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* leve
   free_queue(queue);
 }
 
+void bfs_visited_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool *visited) {
+
+  omp_lock_t qlock;
+
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = true;
+  enqueue(queue, startVertex);
+  level[startVertex] = 0;
+
+  omp_init_lock(&qlock);
+
+#pragma omp parallel
+  {
+    UINT_t v;
+    
+    while (!isEmpty(queue)) {
+      omp_set_lock(&qlock);
+      if (!isEmpty(queue)) {
+	v = dequeue(queue);
+	omp_unset_lock(&qlock);
+      }
+      else {
+	omp_unset_lock(&qlock);
+	continue;
+      }
+      for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
+	UINT_t w = graph->colInd[i];
+	if (!visited[w])  {
+	  visited[w] = true;
+	  omp_set_lock(&qlock);
+	  enqueue(queue, w);
+	  omp_unset_lock(&qlock);
+	  level[w] = level[v] + 1;
+	}
+      }
+    }
+  }
+
+  free_queue(queue);
+  omp_destroy_lock(&qlock);
+}
+
 void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited, bool* horiz) {
   const UINT_t *restrict Ap = graph->rowPtr;
   const UINT_t *restrict Ai = graph->colInd;

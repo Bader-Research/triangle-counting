@@ -1,0 +1,200 @@
+1,3d0
+< 
+< #include "tc.h"
+< 
+7d3
+< 
+15c11
+< gk_graph_t *ptc_Preprocess(params_t *params, vault_t *vault)
+---
+> GRAPH_TYPE *ptc_Preprocess(const GRAPH_TYPE *originalGraph)
+18c14
+<   ssize_t *xadj, *nxadj, *psums;
+---
+>   int32_t *xadj, *nxadj, *psums;
+21c17
+<   gk_graph_t *graph;
+---
+>   GRAPH_TYPE *graph;
+23c19,23
+<   nthreads = params->nthreads;
+---
+> #pragma omp parallel
+>   {
+>     #pragma omp single
+>     nthreads = omp_get_num_threads();
+>   }
+25,27c25,27
+<   nvtxs  = vault->graph->nvtxs;
+<   xadj   = vault->graph->xadj;
+<   adjncy = vault->graph->adjncy;
+---
+>   nvtxs  = (int32_t)originalGraph->numVertices;
+>   xadj   = (int32_t *)originalGraph->rowPtr;
+>   adjncy = (int32_t *)originalGraph->colInd;
+29,32c29,33
+<   graph = gk_graph_Create();
+<   graph->nvtxs  = nvtxs;
+<   graph->xadj   = nxadj = gk_zmalloc(nvtxs+1, "nxadj");
+<   graph->adjncy = nadjncy = gk_i32malloc(nvtxs+xadj[nvtxs], "nadjncy");
+---
+>   graph = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+>   graph->numVertices = nvtxs;
+>   graph->numEdges = /* nvtxs+xadj[nvtxs] */ xadj[nvtxs];
+>   graph->rowPtr = nxadj = (int32_t *)malloc((nvtxs+1) * sizeof(int32_t));
+>   graph->colInd = nadjncy = (int32_t *)((nvtxs+xadj[nvtxs]) * sizeof(int32_t));
+34,35c35,36
+<   perm  = gk_i32malloc(nvtxs, "perm");   /* perm[old-vtx-num]  => new-vtx-num */
+<   iperm = gk_i32malloc(nvtxs, "iperm");  /* iperm[new-vtx-num] => old-vtx-num */
+---
+>   perm  = (int32_t *)malloc(nvtxs * sizeof(int32_t));
+>   iperm = (int32_t *)malloc(nvtxs * sizeof(int32_t));
+42c43
+<     maxdegree = gk_max(maxdegree, (int32_t)(xadj[vi+1]-xadj[vi]));
+---
+>     maxdegree = max(maxdegree, (int32_t)(xadj[vi+1]-xadj[vi]));
+48,49c49,50
+<   gcounts = gk_i32malloc(nthreads*csrange, "gcounts");
+<   psums   = gk_zmalloc(nthreads, "psums");
+---
+>   gcounts = (int32_t *)malloc((nthreads*csrange) * sizeof(int32_t));
+>   psums   = (int32_t *)malloc(nthreads * sizeof(int32_t));
+52,53c53
+<      shared(vault, nvtxs, nthreads, maxdegree, csrange, xadj, adjncy, nxadj, nadjncy, \
+<             perm, iperm, gcounts, psums, chunkptr, stdout) 
+---
+>     shared(nvtxs, nthreads, maxdegree, csrange, xadj, adjncy, nxadj, nadjncy, perm, iperm, gcounts, psums, chunkptr) 
+58,59c58
+<     ssize_t ej, ejend, psum, chunksize;
+< #if defined(_OPENMP)
+---
+>     int32_t ej, ejend, psum, chunksize;
+61,63d59
+< #else
+<     int mytid = 0;
+< #endif
+66c62
+<     viend   = gk_min(nvtxs, (mytid+1)*((nvtxs+nthreads-1)/nthreads));
+---
+>     viend   = min(nvtxs, (mytid+1)*((nvtxs+nthreads-1)/nthreads));
+69c65
+<     dend   = gk_min(csrange, (mytid+1)*((csrange+nthreads-1)/nthreads));
+---
+>     dend   = min(csrange, (mytid+1)*((csrange+nthreads-1)/nthreads));
+73c69,70
+<     gk_i32set(csrange, 0, counts);
+---
+>     for (int i = 0 ; i < csrange ; i++)
+>       counts[i] = 0;
+160c157
+<     chunkptr = gk_i32malloc(psums[nthreads-1]+1, "chunkptr");
+---
+>     chunkptr = (int32_t *)malloc((psums[nthreads-1]+1) * sizeof(int32_t));
+186a184
+>     printf("HERE A\n");
+191a190
+> 	printf("T%d: ci: %d  vi: %d  vj: %d\n",omp_get_thread_num(),ci,vi,vj);
+196a196
+> 	printf("T%d: before sort\n",omp_get_thread_num());
+198c198,199
+<           gk_i32sorti(nedges, buffer);  /* sort adjncy list */
+---
+> 	  qsort(buffer, nedges, sizeof(int32_t), intCompare);
+> 	printf("T%d: after sort\n",omp_get_thread_num());
+200a202
+>     printf("HERE B\n");
+204c206,210
+<   gk_free((void **)&perm, &iperm, &gcounts, &psums, &chunkptr, LTERM);
+---
+>   free(perm);
+>   free(iperm);
+>   free(gcounts);
+>   free(psums);
+>   free(chunkptr);
+220c226
+< int64_t ptc_MapJIK(params_t *params, vault_t *vault)
+---
+> UINT_t tc_MapJIK_P(const GRAPH_TYPE *originalGraph)
+222a229
+> #if 0
+223a231,233
+> #else
+>   int32_t ei, ej;
+> #endif
+224a235
+> #if 0
+225a237,239
+> #else
+>   int32_t *xadj, *uxadj;
+> #endif
+228,229c242
+<   gk_graph_t *graph;
+<   uint64_t nprobes=0;
+---
+>   GRAPH_TYPE *graph;
+231,233c244
+<   gk_startwctimer(vault->timer_pp);
+<   graph = ptc_Preprocess(params, vault);
+<   gk_stopwctimer(vault->timer_pp);
+---
+>   graph = ptc_Preprocess(originalGraph);
+235,237c246,248
+<   nvtxs  = graph->nvtxs;
+<   xadj   = graph->xadj;
+<   adjncy = graph->adjncy;
+---
+>   nvtxs  = (int32_t)graph->numVertices;
+>   xadj   = (int32_t *)graph->rowPtr;
+>   adjncy = (int32_t *)graph->colInd;
+239,241c250
+<   uxadj = gk_zmalloc(nvtxs, "uxadj"); /* the locations of the upper triangular part */
+< 
+<   gk_startwctimer(vault->timer_tc);
+---
+>   uxadj = (int32_t *)(nvtxs * sizeof(int32_t)); /* the locations of the upper triangular part */
+254c263
+<     maxhmsize = gk_max(maxhmsize, (int32_t)(xadj[vi+1]-uxadj[vi]));
+---
+>     maxhmsize = max(maxhmsize, (int32_t)(xadj[vi+1]-uxadj[vi]));
+273,274c282,283
+<     shared(params, vault, nvtxs, xadj, adjncy, uxadj, maxhmsize, startv, stdout) \
+<     reduction(+: ntriangles, nprobes)
+---
+>     shared(nvtxs, xadj, adjncy, uxadj, maxhmsize, startv) \
+>     reduction(+: ntriangles)
+277c286
+<     ssize_t ei, eiend, eistart, ej, ejend, ejstart;
+---
+>     int32_t ei, eiend, eistart, ej, ejend, ejstart;
+286c295
+<     hmap = gk_i32smalloc(maxhmsize+1, 0, "hmap");
+---
+>     hmap = (int32_t *)calloc(maxhmsize+1, sizeof(int32_t));
+319d327
+<           nprobes += ei-uxadj[vi];
+342d349
+<           nprobes += ei-uxadj[vi];
+371d377
+<           nprobes += ei-uxadj[vi];
+389d394
+<           nprobes += ei-uxadj[vi];
+402c407
+<     gk_free((void **)&hmap, LTERM);
+---
+>     free(hmap);
+405,408c410,411
+<   gk_stopwctimer(vault->timer_tc);
+< 
+<   gk_graph_Free(&graph);
+<   gk_free((void **)&uxadj, LTERM);
+---
+>   free_graph(graph);
+>   free(uxadj);
+410,412c413
+<   vault->nprobes = nprobes;
+< 
+<   return ntriangles;
+---
+>   return (UINT_t)ntriangles;
+413a415
+> 

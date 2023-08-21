@@ -436,6 +436,7 @@ main(int argc, char **argv) {
 #ifdef PARALLEL
   if (BENCHMARK_BFS) {
     benchmarkBFS(bfs_visited, originalGraph, "bfs_visited");
+    benchmarkBFS(bfs_visited_P, originalGraph, "bfs_visited_P");
     benchmarkBFS(bfs_hybrid_visited, originalGraph, "bfs_hybrid_visited");
     benchmarkBFS(bfs_hybrid_visited_P, originalGraph, "bfs_hybrid_visited_P");
     benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_P");
@@ -498,6 +499,7 @@ main(int argc, char **argv) {
   benchmarkTC_P(tc_intersectHash_DO_P, originalGraph, graph, "tc_intersect_Hash_DO_P");
   benchmarkTC_P(tc_bader_bfs1_P, originalGraph, graph, "tc_bader_bfs1_P");
   benchmarkTC_P(tc_bader_bfs3_P, originalGraph, graph, "tc_bader_bfs3_P");
+  benchmarkTC_P(tc_bader_bfs_visited_P, originalGraph, graph, "tc_bader_bfs_visited_P");
   benchmarkTC_P(tc_bader_bfs_hybrid_P, originalGraph, graph, "tc_bader_bfs_hybrid_P");
   benchmarkTC_P(tc_bader_bfs_hybrid2_P, originalGraph, graph, "tc_bader_bfs_hybrid2_P");
   benchmarkTC_P(tc_bader_bfs_chatgpt_P, originalGraph, graph, "tc_bader_bfs_chatgpt_P");

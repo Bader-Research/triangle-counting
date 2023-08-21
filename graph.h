@@ -32,6 +32,7 @@ void bfs(const GRAPH_TYPE *, const UINT_t, UINT_t*);
 void bfs_visited(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);
 void bfs_hybrid_visited(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);
 #ifdef PARALLEL
+void bfs_visited_P(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);
 void bfs_hybrid_visited_P(const GRAPH_TYPE *, const UINT_t, UINT_t*, bool *);
 void bfs_chatgpt_P(const GRAPH_TYPE*, const UINT_t, UINT_t *, bool *);
 void bfs_locks_P(const GRAPH_TYPE*, const UINT_t, UINT_t *, bool *);
