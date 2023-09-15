@@ -1,6 +1,7 @@
 #include "types.h"
 #include "queue.h"
 #include "graph.h"
+#include "bfs.h"
 #include "tc.h"
 
 

@@ -1,6 +1,7 @@
 #include "types.h"
 #include "queue.h"
 #include "graph.h"
+#include "bfs.h"
 #include "tc.h"
 #ifdef PARALLEL
 #include "tc_parallel.h"
@@ -441,6 +442,7 @@ main(int argc, char **argv) {
     benchmarkBFS(bfs_hybrid_visited_P, originalGraph, "bfs_hybrid_visited_P");
     benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_P");
     benchmarkBFS(bfs_locks_P, originalGraph, "bfs_locks_P");
+    //    benchmarkBFS(bfs_beamerGAP_P, originalGraph, "bfs_beamerGAP_P");
     goto done;
   }
 #endif

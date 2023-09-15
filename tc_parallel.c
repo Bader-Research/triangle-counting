@@ -2,6 +2,7 @@
 
 #include "types.h"
 #include "graph.h"
+#include "bfs.h"
 #include "tc_parallel.h"
 #include <unistd.h>
 #include <omp.h>
