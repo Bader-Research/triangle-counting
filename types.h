@@ -47,10 +47,10 @@ static struct timezone tzp;
 #define min(a,b) ((a)<(b)?(a):(b))
 
 static void assert_malloc(const void *ptr) {
-    if (ptr==NULL) {
-	fprintf(stderr,"ERROR: Null pointer\n");
-	exit(1);
-    }
+  if (ptr==NULL) {
+    fprintf(stderr,"ERROR: Null pointer\n");
+    exit(1);
+  }
 }
 
 extern bool QUIET;

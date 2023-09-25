@@ -1553,4 +1553,177 @@ UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *graph) {
 }
 
 
+UINT_t tc_bader_recursive(const GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Partition edges into two sets -- horizontal and non-horizontal (spanning two levels). */
+  /* Run hash intersections on the non-horizontal edge graph using the horizontal edges. */
+  /* Run recursively on horizontal graph or forward_hash if the graph is small enough */
+  /* Direction oriented. */
+  UINT_t* level;
+  UINT_t count;
+  bool *Hash, *Hash2;
+  bool *horiz;
+  bool *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(level);
+
+  visited = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(visited);
+
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
+
+  Hash2 = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash2);
+
+  horiz = (bool *)malloc(m * sizeof(bool));
+  assert_malloc(horiz);
+
+  Queue *queue = createQueue(n);
+
+  for (UINT_t v=0 ; v<n ; v++)
+    if (!level[v])
+      bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
+
+  free_queue(queue);
+  free(visited);
+
+  GRAPH_TYPE *graph0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph0);
+  graph0->numVertices = n;
+  graph0->numEdges = m;
+  allocate_graph(graph0);
+  UINT_t* restrict Ap0 = graph0->rowPtr;
+  UINT_t* restrict Ai0 = graph0->colInd;
+
+  GRAPH_TYPE *graph1 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graph1);
+  graph1->numVertices = n;
+  graph1->numEdges = m;
+  allocate_graph(graph1);
+  UINT_t* restrict Ap1 = graph1->rowPtr;
+  UINT_t* restrict Ai1 = graph1->colInd;
+
+  UINT_t edgeCountG0 = 0;
+  UINT_t edgeCountG1 = 0;
+  Ap0[0] = 0;
+  Ap1[0] = 0;
+  for (UINT_t v=0 ; v<n ; v++) {
+    register const UINT_t s = Ap[v];
+    register const UINT_t e = Ap[v+1];
+    register const UINT_t lv = level[v];
+    for (UINT_t j=s ; j<e ; j++) {
+      register UINT_t w = Ai[j];
+      if (lv == level[w] ) {
+	/* add (v,w) to G0 */
+	Ai0[edgeCountG0] = w;
+	edgeCountG0++;
+        Hash2[v]=true;
+        Hash2[w]=true;
+      }
+      else {
+        //if (lv != level[w] ) {
+	    /* add (v,w) to G1 */
+	    Ai1[edgeCountG1] = w;
+	    edgeCountG1++;
+        //}
+      }
+    }
+    Ap0[v+1] = edgeCountG0;
+    Ap1[v+1] = edgeCountG1;
+  }
+
+  graph0->numEdges = edgeCountG0;
+  graph1->numEdges = edgeCountG1;
+
+  /* Calculate G1 */
+  
+  count=0;
+  for (UINT_t v=0 ; v<n ; v++) {
+    register const UINT_t s0 = Ap0[v  ];
+    register const UINT_t e0 = Ap0[v+1];
+    register const UINT_t s1 = Ap1[v  ];
+    register const UINT_t e1 = Ap1[v+1];
+
+    if (s1<e1) {
+
+      for (UINT_t j=s1 ; j<e1 ; j++)
+	Hash[Ai1[j]] = true;
+    
+      for (UINT_t j=s0 ; j<e0 ; j++) {
+	register const UINT_t w = Ai0[j];
+	if (v<w) {
+	  for (UINT_t k = Ap1[w]; k < Ap1[w+1] ; k++) {
+	    if (Hash[Ai1[k]]) {
+	      count++;
+	    }
+	  }
+	}
+      }
+
+      for (UINT_t j=s1 ; j<e1 ; j++)
+	Hash[Ai1[j]] = false;
+    }
+  }
+  
+  /* Calculate G0 */
+
+  UINT_t * Vlist = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(Vlist);
+  UINT_t vn = 0;
+   
+  for (UINT_t v=0 ; v<n ; v++) {
+     if (Hash2[v]==true) {
+         Vlist[v]=vn++;
+     }
+  }
+
+  GRAPH_TYPE *graphr0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+  assert_malloc(graphr0);
+  graphr0->numVertices = vn;
+  graphr0->numEdges = edgeCountG0;
+  allocate_graph(graphr0);
+
+  UINT_t* restrict Apr0 = graphr0->rowPtr;
+  UINT_t* restrict Air0 = graphr0->colInd;
+
+  for (UINT_t e=0 ; e<edgeCountG0 ; e++) {
+        Air0[e]=Vlist[Ai0[e]];
+  }
+  
+  for (UINT_t v=0 ; v<n ; v++) {
+     if (Hash2[v]) {
+        Apr0[Vlist[v]]=Ap0[v];
+     }
+  }
+  Apr0[vn] = edgeCountG0;
+  free(Vlist);
+  free(Hash2);
+
+  if (edgeCountG0 < _BADER_RECURSIVE_BASE ) {
+      count += tc_forward_hash_config_size(graph0, m);
+  } else {
+      count +=tc_bader_recursive(graphr0);
+  }
+  
+  free_graph(graph1);
+  free_graph(graph0);
+  free_graph(graphr0);
+
+  free(horiz);
+  free(Hash);
+  free(level);
+
+  return count;
+}
+
+
 

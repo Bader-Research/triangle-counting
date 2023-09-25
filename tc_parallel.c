@@ -728,6 +728,7 @@ UINT_t tc_forward_hash_P(const GRAPH_TYPE *graph) {
 }
 
 
+
 int intCompare(const void * a, const void * b) {
    return ( *(int*)a - *(int*)b );
 }
