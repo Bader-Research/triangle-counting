@@ -53,6 +53,7 @@ void bfs_visited(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* leve
   free_queue(queue);
 }
 
+
 void bfs_visited_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool *visited) {
 
   omp_lock_t qlock;
@@ -68,7 +69,7 @@ void bfs_visited_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* le
 #pragma omp parallel
   {
     UINT_t v;
-    
+
     while (!isEmpty(queue)) {
       omp_set_lock(&qlock);
       if (!isEmpty(queue)) {
@@ -79,22 +80,124 @@ void bfs_visited_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* le
 	omp_unset_lock(&qlock);
 	continue;
       }
+      omp_set_lock(&qlock);
       for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
 	UINT_t w = graph->colInd[i];
 	if (!visited[w])  {
 	  visited[w] = true;
-	  omp_set_lock(&qlock);
 	  enqueue(queue, w);
-	  omp_unset_lock(&qlock);
 	  level[w] = level[v] + 1;
 	}
       }
+      omp_unset_lock(&qlock);
     }
   }
 
   free_queue(queue);
   omp_destroy_lock(&qlock);
 }
+
+
+void bfs_visited_P_DEBUG(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool *visited) {
+
+  omp_lock_t qlock;
+  UINT_t qsize;
+  UINT_t totalenq;
+  UINT_t totaldeq;
+
+  printf("BFS_Visited_P (%d):\n",startVertex);
+
+  int *vstate = (int *)calloc(graph->numVertices, sizeof(int));
+  assert_malloc(vstate);
+  
+  Queue *queue = createQueue(graph->numVertices);
+
+  visited[startVertex] = true;
+  enqueue(queue, startVertex);
+  if (vstate[startVertex] != 0) printf("T%2d: ERROR: ENQ %3d\n",omp_get_thread_num(), startVertex);
+  vstate[startVertex] = 1;
+  qsize = 1;
+  totalenq = 1;
+  level[startVertex] = 0;
+
+  omp_init_lock(&qlock);
+
+#pragma omp parallel
+  {
+    UINT_t v;
+
+    while ( (!isEmpty(queue)) || (qsize>0)) {
+      omp_set_lock(&qlock);
+      if (!isEmpty(queue)) {
+	v = dequeue(queue);
+	printf("T%2d: DEQ %d\n",omp_get_thread_num(), v);
+	if (vstate[v] != 1) printf("T%2d: ERROR: DEQ %3d\n",omp_get_thread_num(), v);
+	vstate[v] = 2;
+	qsize--;
+	totaldeq++;
+	omp_unset_lock(&qlock);
+      }
+      else {
+	omp_unset_lock(&qlock);
+	continue;
+      }
+      omp_set_lock(&qlock);
+      for (UINT_t i = graph->rowPtr[v]; i < graph->rowPtr[v + 1]; i++) {
+	UINT_t w = graph->colInd[i];
+	if (!visited[w])  {
+	  /* omp_set_lock(&qlock); */
+	  if (!visited[w]) {
+	    visited[w] = true;
+	    printf("T%2d: ENQ %d\n",omp_get_thread_num(), w);
+	    if (vstate[w] != 0) printf("T%2d: ERROR: ENQ %3d\n",omp_get_thread_num(), w);
+	    vstate[w] = 1;
+	    enqueue(queue, w);
+	    qsize++;
+	    totalenq++;
+	    
+	    level[w] = level[v] + 1;
+	    printf("T%2d: Level[%3d] <-- %3d  treeedge: (%3d, %3d) \n",omp_get_thread_num(), w, level[w],v, w);
+	  }
+	  /* omp_unset_lock(&qlock); */
+	}
+      }
+      omp_unset_lock(&qlock);
+
+    }
+    fflush(stdout);
+    #pragma omp barrier
+  }
+
+  printf("q empty: %d  qsize: %d  total enq: %d total deq: %d  n: %d\n",isEmpty(queue)?1:0, qsize, totalenq, totaldeq, graph->numVertices);
+
+
+  /* CHECK */
+  UINT_t *checkLevel = (UINT_t *)malloc(graph->numVertices * sizeof(UINT_t));
+  assert_malloc(checkLevel);
+  bool *checkVisited = (bool *)malloc(graph->numVertices * sizeof(bool));
+  assert_malloc(checkVisited);
+
+  for (int i=0 ; i<graph->numVertices; i++) checkLevel[i] = 0;
+  for (int i=0 ; i<graph->numVertices; i++) checkVisited[i] = false;
+  bfs_visited(graph, startVertex, checkLevel, checkVisited);
+
+  for (int i=0 ; i<graph->numVertices; i++) {
+    if (checkVisited[i]) {
+      if (level[i] != checkLevel[i])
+	printf("ERROR: Level[%3d]: %3d (not %3d)\n",i, level[i], checkLevel[i]);
+    }
+  }
+
+
+  free(checkVisited);
+  free(checkLevel);
+  /********/
+
+  free(vstate);
+  free_queue(queue);
+  omp_destroy_lock(&qlock);
+}
+
 
 void bfs_mark_horizontal_edges(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited, bool* horiz) {
   const UINT_t *restrict Ap = graph->rowPtr;
