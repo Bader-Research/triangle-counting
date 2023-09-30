@@ -473,6 +473,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_bader_forward_hash, originalGraph, graph, "tc_bader_forward_hash");
   benchmarkTC(tc_bader_forward_hash_degreeOrder, originalGraph, graph, "tc_bader_forward_hash_degOrd");
   benchmarkTC(tc_bader_recursive, originalGraph, graph, "tc_bader_recursive");
+  benchmarkTC(tc_bader_hybrid, originalGraph, graph, "tc_bader_hybrid");
   benchmarkTC(tc_treelist, originalGraph, graph, "tc_treelist");
   benchmarkTC(tc_treelist2, originalGraph, graph, "tc_treelist2");
   if (NCUBED)

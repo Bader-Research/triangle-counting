@@ -1596,6 +1596,8 @@ UINT_t tc_bader_recursive(const GRAPH_TYPE *graph) {
   free_queue(queue);
   free(visited);
 
+
+
   GRAPH_TYPE *graph0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
   assert_malloc(graph0);
   graph0->numVertices = n;
@@ -1676,47 +1678,49 @@ UINT_t tc_bader_recursive(const GRAPH_TYPE *graph) {
   
   /* Calculate G0 */
 
-  UINT_t * Vlist = (UINT_t *)calloc(n, sizeof(UINT_t));
-  assert_malloc(Vlist);
-  UINT_t vn = 0;
-   
-  for (UINT_t v=0 ; v<n ; v++) {
-     if (Hash2[v]==true) {
-         Vlist[v]=vn++;
-     }
-  }
-
-  GRAPH_TYPE *graphr0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
-  assert_malloc(graphr0);
-  graphr0->numVertices = vn;
-  graphr0->numEdges = edgeCountG0;
-  allocate_graph(graphr0);
-
-  UINT_t* restrict Apr0 = graphr0->rowPtr;
-  UINT_t* restrict Air0 = graphr0->colInd;
-
-  for (UINT_t e=0 ; e<edgeCountG0 ; e++) {
-        Air0[e]=Vlist[Ai0[e]];
-  }
-  
-  for (UINT_t v=0 ; v<n ; v++) {
-     if (Hash2[v]) {
-        Apr0[Vlist[v]]=Ap0[v];
-     }
-  }
-  Apr0[vn] = edgeCountG0;
-  free(Vlist);
-  free(Hash2);
 
   if (edgeCountG0 < _BADER_RECURSIVE_BASE ) {
-      count += tc_forward_hash_config_size(graph0, m);
-  } else {
-      count +=tc_bader_recursive(graphr0);
+    count += tc_forward_hash_config_size(graph0, m);
+  }
+  else {
+
+    UINT_t * Vlist = (UINT_t *)calloc(n, sizeof(UINT_t));
+    assert_malloc(Vlist);
+    UINT_t vn = 0;
+   
+    for (UINT_t v=0 ; v<n ; v++) {
+      if (Hash2[v]) {
+	Vlist[v] = vn++;
+      }
+    }
+
+    GRAPH_TYPE *graphr0 = (GRAPH_TYPE *)malloc(sizeof(GRAPH_TYPE));
+    assert_malloc(graphr0);
+    graphr0->numVertices = vn;
+    graphr0->numEdges = edgeCountG0;
+    allocate_graph(graphr0);
+
+    UINT_t* restrict Apr0 = graphr0->rowPtr;
+    UINT_t* restrict Air0 = graphr0->colInd;
+
+    for (UINT_t e=0 ; e<edgeCountG0 ; e++) {
+      Air0[e] = Vlist[Ai0[e]];
+    }
+  
+    for (UINT_t v=0 ; v<n ; v++) {
+      if (Hash2[v])
+	Apr0[Vlist[v]] = Ap0[v];
+    }
+    Apr0[vn] = edgeCountG0;
+    free(Vlist);
+    free(Hash2);
+
+    count += tc_bader_recursive(graphr0);
+    free_graph(graphr0);
   }
   
   free_graph(graph1);
   free_graph(graph0);
-  free_graph(graphr0);
 
   free(horiz);
   free(Hash);
@@ -1724,6 +1728,97 @@ UINT_t tc_bader_recursive(const GRAPH_TYPE *graph) {
 
   return count;
 }
+
+
+
+UINT_t tc_bader_level(const GRAPH_TYPE *graph, UINT_t * level) {
+  /* Direction orientied. */
+  UINT_t s, e, l, w;
+  UINT_t c1, c2;
+
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  c1 = 0; c2 = 0;
+  for (UINT_t v=0 ; v<n ; v++) {
+    s = Ap[v  ];
+    e = Ap[v+1];
+    l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      w = Ai[j];
+      if ((v < w) && (level[w] == l))
+	bader_intersectSizeMergePath(graph, level, v, w, &c1, &c2);
+    }
+  }
+
+  return c1 + (c2/3);
+}
+
+UINT_t tc_bader_hybrid(const GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting based on BFS */
+  /* Uses Hash array to detect triangles (v, w, x) if x is adjacent to v */
+  /* For level[], 0 == unvisited. Needs a modified BFS starting from level 1 */
+  /* Mark horizontal edges during BFS */
+  /* Partition edges into two sets -- horizontal and non-horizontal (spanning two levels). */
+  /* Run hash intersections on the non-horizontal edge graph using the horizontal edges. */
+  /* Run recursively on horizontal graph or forward_hash if the graph is small enough */
+  /* Direction oriented. */
+  UINT_t* level;
+  UINT_t count;
+  bool *Hash, *Hash2;
+  bool *horiz;
+  bool *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(level);
+
+  visited = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(visited);
+
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
+
+  horiz = (bool *)malloc(m * sizeof(bool));
+  assert_malloc(horiz);
+
+  Queue *queue = createQueue(n);
+
+  for (UINT_t v=0 ; v<n ; v++)
+    if (!level[v])
+      bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
+
+  free_queue(queue);
+  free(visited);
+
+  UINT_t k = 0;
+  
+  for (UINT_t v=0 ; v<n ; v++) {
+    UINT_t s = Ap[v  ];
+    UINT_t e = Ap[v+1];
+    UINT_t l = level[v];
+    for (UINT_t j = s ; j<e ; j++) {
+      INT_t w = Ai[j];
+      if ((v < w) && (level[w] == l)) {
+	k++;
+      }
+    }
+  }
+
+  double pk=2.0 * (double)k/(double)graph->numEdges;
+  if (graph->numEdges<_BADER_RECURSIVE_BASE || pk> 0.7)
+    count = tc_forward_hash(graph) ;
+  else
+    count = tc_bader_level(graph, level);
+
+  free(level);
+  return count;
+}
+
 
 
 
