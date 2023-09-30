@@ -462,6 +462,7 @@ main(int argc, char **argv) {
   benchmarkTC(tc_forward_hash_skip, originalGraph, graph, "tc_forward_hash_skip");
   benchmarkTC(tc_forward_hash_degreeOrder, originalGraph, graph, "tc_forward_hash_degreeOrder");
   benchmarkTC(tc_forward_hash_degreeOrderReverse, originalGraph, graph, "tc_forward_hash_degreeOrderRev");
+  benchmarkTC(tc_compact_forward, originalGraph, graph, "tc_compact_forward");
   benchmarkTC(tc_davis, originalGraph, graph, "tc_davis");
   benchmarkTC(tc_low, originalGraph, graph, "tc_low");
   benchmarkTC(tc_bader, originalGraph, graph, "tc_bader");

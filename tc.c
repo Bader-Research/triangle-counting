@@ -975,6 +975,92 @@ UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *graph) {
 }
 
 
+/**** COMPACT FORWARD ***/
+
+UINT_t firstNeighborIndex(const GRAPH_TYPE *graph, UINT_t i) {
+  
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  UINT_t s = Ap[i];
+  UINT_t e = Ap[i+1];
+
+  UINT_t index = n-1;
+  
+  for (UINT_t w=s ; w<e ; w++)
+    if (Ai[w] < index)
+      index = Ai[w];
+
+  return index;
+}
+
+UINT_t nextNeighborIndex(const GRAPH_TYPE *graph, UINT_t i, UINT_t j) {
+  
+  const UINT_t* restrict Ap = graph->rowPtr;
+  const UINT_t* restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+
+  UINT_t s = Ap[i];
+  UINT_t e = Ap[i+1];
+
+  UINT_t index = n-1;
+  
+  for (UINT_t w=s ; w<e ; w++)
+    if ((Ai[w] > j) && (Ai[w] < index))
+      index = Ai[w];
+
+  return index;
+}
+
+
+UINT_t tc_compact_forward(const GRAPH_TYPE *graph) {
+  /* Compact Forward, Algorithm 3.7 from
+     "Algorithmic Aspects of Triangle-Based Network Analysis,"
+     Thomas Schank, dissertation, February 2007. which is from
+     Matthieu Latapy. Theory and practice of triangle problems in very large
+     (sparse (power-law)) graphs, 2006. */
+  
+  UINT_t count = 0;
+
+  GRAPH_TYPE *graph2;
+  graph2 = reorder_graph_by_degree(graph, REORDER_HIGHEST_DEGREE_FIRST);
+
+  const UINT_t* restrict Ap = graph2->rowPtr;
+  const UINT_t* restrict Ai = graph2->colInd;
+  const UINT_t n = graph2->numVertices;
+
+
+  for (UINT_t i=0 ; i<n ; i++) {
+    UINT_t s = Ap[i];
+    UINT_t e = Ap[i+1];
+    for (UINT_t w=s ; w<e ; w++) {
+      UINT_t l = Ai[w];
+      if (l<i) {
+	UINT_t j = firstNeighborIndex(graph2, i);
+	UINT_t k = firstNeighborIndex(graph2, l);
+	while ((j<l) && (k<l)) {
+	  if (j<k) {
+	    j = nextNeighborIndex(graph2, i, j);
+	  }
+	  else {
+	    if (k<j) {
+	      k = nextNeighborIndex(graph2, l, k);
+	    }
+	    else {
+	      count++;
+	      j = nextNeighborIndex(graph2, i, j);
+	      k = nextNeighborIndex(graph2, l, k);
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  free_graph(graph2);
+  return count;
+}
 
 static void bfs_bader3(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* restrict level, Queue* queue, bool* visited) {
   const UINT_t *restrict Ap = graph->rowPtr;

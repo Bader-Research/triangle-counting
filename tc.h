@@ -27,6 +27,7 @@ UINT_t tc_forward_hash(const GRAPH_TYPE *);
 UINT_t tc_forward_hash_skip(const GRAPH_TYPE *);
 UINT_t tc_forward_hash_degreeOrder(const GRAPH_TYPE *);
 UINT_t tc_forward_hash_degreeOrderReverse(const GRAPH_TYPE *);
+UINT_t tc_compact_forward(const GRAPH_TYPE *);
 UINT_t tc_bader(const GRAPH_TYPE *);
 UINT_t tc_bader2(const GRAPH_TYPE *);
 UINT_t tc_bader3(const GRAPH_TYPE *);
