@@ -38,6 +38,7 @@ UINT_t tc_bader_forward_hash(const GRAPH_TYPE *);
 UINT_t tc_bader_forward_hash_degreeOrder(const GRAPH_TYPE *);
 UINT_t tc_bader_recursive(const GRAPH_TYPE *);
 UINT_t tc_bader_hybrid(const GRAPH_TYPE *);
+UINT_t tc_bader_new_bfs(const GRAPH_TYPE *);
 
 #define _BADER_RECURSIVE_BASE 100000
 #endif

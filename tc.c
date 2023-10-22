@@ -1389,10 +1389,10 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
     const UINT_t e = Ap[v+1];
     const UINT_t l = level[v];
 
-    for (UINT_t p = s ; p<e ; p++)
-      Hash[Ai[p]] = true;
+    for (UINT_t j = s ; j < e ; j++)
+      Hash[Ai[j]] = true;
     
-    for (UINT_t j = s ; j<e ; j++) {
+    for (UINT_t j = s ; j < e ; j++) {
       if (horiz[j]) {
 	const UINT_t w = Ai[j];
 	if (v < w) {
@@ -1408,8 +1408,8 @@ UINT_t tc_bader5(const GRAPH_TYPE *graph) {
       }
     }
 
-    for (UINT_t p = s ; p<e ; p++)
-      Hash[Ai[p]] = false;
+    for (UINT_t j = s ; j < e ; j++)
+      Hash[Ai[j]] = false;
   }
 
   free_queue(queue);
@@ -1866,8 +1866,10 @@ UINT_t tc_bader_hybrid(const GRAPH_TYPE *graph) {
   visited = (bool *)calloc(n, sizeof(bool));
   assert_malloc(visited);
 
+#if 0
   Hash = (bool *)calloc(n, sizeof(bool));
   assert_malloc(Hash);
+#endif
 
   horiz = (bool *)malloc(m * sizeof(bool));
   assert_malloc(horiz);
@@ -1878,6 +1880,9 @@ UINT_t tc_bader_hybrid(const GRAPH_TYPE *graph) {
     if (!level[v])
       bfs_mark_horizontal_edges(graph, v, level, queue, visited, horiz);
 
+#if 1
+  free(horiz);
+#endif
   free_queue(queue);
   free(visited);
 
@@ -1903,6 +1908,94 @@ UINT_t tc_bader_hybrid(const GRAPH_TYPE *graph) {
 
   free(level);
   return count;
+}
+
+
+
+
+UINT_t tc_bader_new_bfs(const GRAPH_TYPE *graph) {
+  /* Bader's new algorithm for triangle counting integreated with  BFS */
+  /* Direction oriented. */
+  UINT_t* level;
+  UINT_t c1, c2;
+  bool *Hash;
+  bool *visited;
+  const UINT_t *restrict Ap = graph->rowPtr;
+  const UINT_t *restrict Ai = graph->colInd;
+  const UINT_t n = graph->numVertices;
+  const UINT_t m = graph->numEdges;
+
+  level = (UINT_t *)calloc(n, sizeof(UINT_t));
+  assert_malloc(level);
+
+  visited = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(visited);
+
+  Hash = (bool *)calloc(n, sizeof(bool));
+  assert_malloc(Hash);
+
+  Queue *queue = createQueue(n);
+
+  c1 = 0; c2 = 0;
+  for (UINT_t x=0 ; x<n ; x++)
+    if (!visited[x]) {
+
+      visited[x] = true;
+      enqueue(queue, x);
+      level[x] = 1;
+  
+      while (!isEmpty(queue)) {
+	UINT_t v = dequeue(queue);
+	UINT_t lv = level[v];
+	UINT_t s = Ap[v];
+	UINT_t e = Ap[v+1];
+
+	UINT_t dv = e-s;
+
+	for (UINT_t x = s; x < e ; x++)
+	  Hash[Ai[x]] = true;
+	
+	for (UINT_t j = s; j < e ; j++) {
+	  UINT_t w = Ai[j];
+	  if (!visited[w])  {
+	    visited[w] = true;
+	    enqueue(queue, w);
+	    level[w] = lv + 1;
+	  }
+	  else {
+	    UINT_t sw = Ap[w];
+	    UINT_t ew = Ap[w+1];
+	    UINT_t dw = ew-sw;
+	    
+	    if (((dv>dw) || ((dv==dw) && (v<w)) ) && (level[w]==lv)) {
+
+	      for (UINT_t k = sw; k < ew ; k++) {
+	        UINT_t y = Ai[k];
+		if (Hash[y]) {
+		  if (level[y] != lv)
+		    c1++;
+		  else
+		    c2++;
+		}
+	      }
+
+
+	    }
+	  }
+	}
+	
+	for (UINT_t x = s; x < e ; x++)
+	  Hash[Ai[x]] = false;
+
+      }
+    }
+
+  free_queue(queue);
+  free(Hash);
+  free(visited);
+  free(level);
+
+  return c1 + (c2/3);
 }
 
 
