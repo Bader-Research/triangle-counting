@@ -885,11 +885,446 @@ void bfs_beamerGAP_P(const GRAPH_TYPE* graph, const UINT_t startVertex, UINT_t* 
   return;
 }
 
+#endif
+
+#ifdef PARALLEL
+
+// Thread-safe concurrent queue implementation
+typedef struct ConcurrentQueue {
+    UINT_t* items;
+    UINT_t capacity;
+    volatile UINT_t head;
+    volatile UINT_t tail;
+    omp_lock_t lock;
+} ConcurrentQueue;
+
+ConcurrentQueue* create_concurrent_queue(UINT_t capacity) {
+    ConcurrentQueue* q = (ConcurrentQueue*)malloc(sizeof(ConcurrentQueue));
+    assert_malloc(q);
+    q->items = (UINT_t*)malloc(capacity * sizeof(UINT_t));
+    assert_malloc(q->items);
+    q->capacity = capacity;
+    q->head = 0;
+    q->tail = 0;
+    omp_init_lock(&q->lock);
+    return q;
+}
+
+void destroy_concurrent_queue(ConcurrentQueue* q) {
+    omp_destroy_lock(&q->lock);
+    free(q->items);
+    free(q);
+}
+
+bool concurrent_enqueue(ConcurrentQueue* q, UINT_t item) {
+    omp_set_lock(&q->lock);
+    UINT_t next_tail = (q->tail + 1) % q->capacity;
+    if (next_tail == q->head) {
+        omp_unset_lock(&q->lock);
+        return false; // Queue full
+    }
+    q->items[q->tail] = item;
+    q->tail = next_tail;
+    omp_unset_lock(&q->lock);
+    return true;
+}
+
+bool concurrent_try_dequeue(ConcurrentQueue* q, UINT_t* item) {
+    omp_set_lock(&q->lock);
+    if (q->head == q->tail) {
+        omp_unset_lock(&q->lock);
+        return false; // Queue empty
+    }
+    *item = q->items[q->head];
+    q->head = (q->head + 1) % q->capacity;
+    omp_unset_lock(&q->lock);
+    return true;
+}
+
+bool concurrent_is_empty(ConcurrentQueue* q) {
+    omp_set_lock(&q->lock);
+    bool empty = (q->head == q->tail);
+    omp_unset_lock(&q->lock);
+    return empty;
+}
+
+void bfs_claude_chaotic_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
+    const UINT_t n = graph->numVertices;
+    UINT_t* Ap = graph->rowPtr;
+    UINT_t* Ai = graph->colInd;
+    
+    INT_t* parent = (INT_t*)malloc(n * sizeof(INT_t));
+    assert_malloc(parent);
+    ConcurrentQueue* queue = create_concurrent_queue(n);
+    
+    for (UINT_t i = 0; i < n; i++) {
+        parent[i] = -1;
+        level[i] = UINT_MAX;
+    }
+    
+    concurrent_enqueue(queue, startVertex);
+    visited[startVertex] = true;
+    parent[startVertex] = startVertex;
+    level[startVertex] = 0;
+    
+    volatile bool done = false;
+    
+    #pragma omp parallel
+    {
+        while (!done) {
+            UINT_t u;
+            if (concurrent_try_dequeue(queue, &u)) {
+                for (UINT_t i = Ap[u]; i < Ap[u + 1]; i++) {
+                    UINT_t v = Ai[i];
+                    
+                    // Try to claim this vertex using compare-and-swap
+                    bool expected = false;
+                    if (__sync_bool_compare_and_swap(&visited[v], expected, true)) {
+                        parent[v] = u;
+                        level[v] = level[u] + 1;
+                        concurrent_enqueue(queue, v);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+            #pragma omp single
+            {
+                done = concurrent_is_empty(queue);
+            }
+        }
+    }
+    
+    destroy_concurrent_queue(queue);
+    free(parent);
+}
+#endif
 
 
 
+#ifdef PARALLEL
+
+void bfs_claude_fine_lock_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
+    const UINT_t n = graph->numVertices;
+    UINT_t* Ap = graph->rowPtr;
+    UINT_t* Ai = graph->colInd;
+    
+    // Initialize arrays
+    for (UINT_t i = 0; i < n; i++) {
+        visited[i] = false;
+        level[i] = UINT_MAX;
+    }
+    
+    visited[startVertex] = true;
+    level[startVertex] = 0;
+    
+    // Multiple queues, one per thread
+    int max_threads = omp_get_max_threads();
+    Queue** queues = (Queue**)malloc(max_threads * sizeof(Queue*));
+    assert_malloc(queues);
+    for (int i = 0; i < max_threads; i++) {
+        queues[i] = createQueue(n);
+    }
+    
+    enqueue(queues[0], startVertex);
+    
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        int num_threads = omp_get_num_threads();
+        int rounds_without_work = 0;
+        
+        while (rounds_without_work < num_threads * 2) {
+            bool did_work = false;
+            
+            // Check all queues starting from own
+            for (int q = 0; q < num_threads; q++) {
+                int qid = (tid + q) % num_threads;
+                
+                if (!isEmpty(queues[qid])) {
+                    UINT_t u = dequeue(queues[qid]);
+                    did_work = true;
+                    rounds_without_work = 0;
+                    
+                    for (UINT_t i = Ap[u]; i < Ap[u + 1]; i++) {
+                        UINT_t v = Ai[i];
+                        
+                        // Use compare-and-swap for thread safety
+                        bool expected = false;
+                        if (__sync_bool_compare_and_swap(&visited[v], expected, true)) {
+                            level[v] = level[u] + 1;
+                            // Add to a queue (distribute by vertex number)
+                            int target_queue = v % num_threads;
+                            enqueue(queues[target_queue], v);
+                        }
+                    }
+                    break;  // Process one vertex at a time
+                }
+            }
+            
+            if (!did_work) {
+                rounds_without_work++;
+            }
+            
+            // Small delay to prevent spinning
+            if (!did_work) {
+                #pragma omp barrier
+            }
+        }
+    }
+    
+    // Cleanup
+    for (int i = 0; i < max_threads; i++) {
+        free_queue(queues[i]);
+    }
+    free(queues);
+}
+
+#endif
 
 
+#ifdef PARALLEL
+
+typedef struct Bag {
+    UINT_t* vertices;
+    UINT_t size;
+    UINT_t capacity;
+} Bag;
+
+Bag* create_bag(UINT_t capacity) {
+    Bag* bag = (Bag*)malloc(sizeof(Bag));
+    assert_malloc(bag);
+    bag->vertices = (UINT_t*)malloc(capacity * sizeof(UINT_t));
+    assert_malloc(bag->vertices);
+    bag->size = 0;
+    bag->capacity = capacity;
+    return bag;
+}
+
+void destroy_bag(Bag* bag) {
+    free(bag->vertices);
+    free(bag);
+}
+
+void add_to_bag(Bag* bag, UINT_t v) {
+    if (bag->size >= bag->capacity) {
+        bag->capacity *= 2;
+        bag->vertices = (UINT_t*)realloc(bag->vertices, bag->capacity * sizeof(UINT_t));
+        assert_malloc(bag->vertices);
+    }
+    bag->vertices[bag->size++] = v;
+}
+
+void merge_bags(Bag* dest, Bag* src) {
+    for (UINT_t i = 0; i < src->size; i++) {
+        add_to_bag(dest, src->vertices[i]);
+    }
+    src->size = 0;
+}
+
+void clear_bag(Bag* bag) {
+    bag->size = 0;
+}
+
+void bfs_claude_bags_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
+    const UINT_t n = graph->numVertices;
+    UINT_t* Ap = graph->rowPtr;
+    UINT_t* Ai = graph->colInd;
+    
+    Bag* current_bag = create_bag(n);
+    Bag* next_bag = create_bag(n);
+    
+    add_to_bag(current_bag, startVertex);
+    visited[startVertex] = true;
+    level[startVertex] = 0;
+    
+    UINT_t current_level = 0;
+    
+    while (current_bag->size > 0) {
+        #pragma omp parallel
+        {
+            // Thread-local bag
+            Bag* thread_local_bag = create_bag(n / omp_get_num_threads() + 1);
+            
+            #pragma omp for schedule(dynamic)
+            for (UINT_t i = 0; i < current_bag->size; i++) {
+                UINT_t u = current_bag->vertices[i];
+                
+                for (UINT_t j = Ap[u]; j < Ap[u + 1]; j++) {
+                    UINT_t v = Ai[j];
+                    
+                    bool expected = false;
+                    if (__sync_bool_compare_and_swap(&visited[v], expected, true)) {
+                        level[v] = current_level + 1;
+                        add_to_bag(thread_local_bag, v);
+                    }
+                }
+            }
+            
+            // Merge thread-local bags into next_bag
+            #pragma omp critical
+            {
+                merge_bags(next_bag, thread_local_bag);
+            }
+            
+            destroy_bag(thread_local_bag);
+        }
+        
+        // Swap bags
+        Bag* temp = current_bag;
+        current_bag = next_bag;
+        next_bag = temp;
+        clear_bag(next_bag);
+        current_level++;
+    }
+    
+    destroy_bag(current_bag);
+    destroy_bag(next_bag);
+}
+#endif
+
+#ifdef PARALLEL
+
+typedef struct Deque {
+    UINT_t* items;
+    volatile UINT_t head;
+    volatile UINT_t tail;
+    UINT_t capacity;
+    omp_lock_t lock;
+} Deque;
+
+Deque* create_deque(UINT_t capacity) {
+    Deque* d = (Deque*)malloc(sizeof(Deque));
+    assert_malloc(d);
+    d->items = (UINT_t*)malloc(capacity * sizeof(UINT_t));
+    assert_malloc(d->items);
+    d->head = 0;
+    d->tail = 0;
+    d->capacity = capacity;
+    omp_init_lock(&d->lock);
+    return d;
+}
+
+void destroy_deque(Deque* d) {
+    omp_destroy_lock(&d->lock);
+    free(d->items);
+    free(d);
+}
+
+bool push_back_deque(Deque* d, UINT_t item) {
+    omp_set_lock(&d->lock);
+    UINT_t next_tail = (d->tail + 1) % d->capacity;
+    if (next_tail == d->head) {
+        omp_unset_lock(&d->lock);
+        return false;
+    }
+    d->items[d->tail] = item;
+    d->tail = next_tail;
+    omp_unset_lock(&d->lock);
+    return true;
+}
+
+bool pop_front_deque(Deque* d, UINT_t* item) {
+    omp_set_lock(&d->lock);
+    if (d->head == d->tail) {
+        omp_unset_lock(&d->lock);
+        return false;
+    }
+    *item = d->items[d->head];
+    d->head = (d->head + 1) % d->capacity;
+    omp_unset_lock(&d->lock);
+    return true;
+}
+
+bool pop_back_deque(Deque* d, UINT_t* item) {
+    omp_set_lock(&d->lock);
+    if (d->head == d->tail) {
+        omp_unset_lock(&d->lock);
+        return false;
+    }
+    d->tail = (d->tail - 1 + d->capacity) % d->capacity;
+    *item = d->items[d->tail];
+    omp_unset_lock(&d->lock);
+    return true;
+}
+
+bool is_deque_empty(Deque* d) {
+    omp_set_lock(&d->lock);
+    bool empty = (d->head == d->tail);
+    omp_unset_lock(&d->lock);
+    return empty;
+}
+
+void bfs_claude_work_stealing_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
+    const UINT_t n = graph->numVertices;
+    UINT_t* Ap = graph->rowPtr;
+    UINT_t* Ai = graph->colInd;
+    
+    int num_threads = omp_get_max_threads();
+    Deque** local_deques = (Deque**)malloc(num_threads * sizeof(Deque*));
+    assert_malloc(local_deques);
+    
+    for (int i = 0; i < num_threads; i++) {
+        local_deques[i] = create_deque(n / num_threads + 1000);
+    }
+    
+    visited[startVertex] = true;
+    level[startVertex] = 0;
+    push_back_deque(local_deques[0], startVertex);
+    
+    #pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+        unsigned int seed = (unsigned int)time(NULL) + tid;
+        volatile bool global_done = false;
+	srand(seed);
+        
+        while (!global_done) {
+            UINT_t u;
+            bool got_work = false;
+            
+            // Try local work first
+            if (pop_front_deque(local_deques[tid], &u)) {
+                got_work = true;
+            } else {
+                // Try to steal from random victim
+                int victim = rand() % num_threads;
+                if (victim != tid && pop_back_deque(local_deques[victim], &u)) {
+                    got_work = true;
+                }
+            }
+            
+            if (got_work) {
+                for (UINT_t i = Ap[u]; i < Ap[u + 1]; i++) {
+                    UINT_t v = Ai[i];
+                    
+                    bool expected = false;
+                    if (__sync_bool_compare_and_swap(&visited[v], expected, true)) {
+                        level[v] = level[u] + 1;
+                        push_back_deque(local_deques[tid], v);
+                    }
+                }
+            }
+            
+            #pragma omp barrier
+            #pragma omp single
+            {
+                global_done = true;
+                for (int t = 0; t < num_threads; t++) {
+                    if (!is_deque_empty(local_deques[t])) {
+                        global_done = false;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    for (int i = 0; i < num_threads; i++) {
+        destroy_deque(local_deques[i]);
+    }
+    free(local_deques);
+}
 #endif
 
 #endif
