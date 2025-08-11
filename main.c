@@ -440,13 +440,13 @@ main(int argc, char **argv) {
     benchmarkBFS(bfs_visited_P, originalGraph, "bfs_visited_P");
     benchmarkBFS(bfs_hybrid_visited, originalGraph, "bfs_hybrid_visited");
     benchmarkBFS(bfs_hybrid_visited_P, originalGraph, "bfs_hybrid_visited_P");
-    benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_chatgpt_P");
-    benchmarkBFS(bfs_locks_P, originalGraph, "bfs_locks_P");
+    benchmarkBFS(bfs_chatgpt_P, originalGraph, "bfs_ChatGPT-o1_P");
+    benchmarkBFS(bfs_locks_P, originalGraph, "bfs_ChatGPT-o1_locks_P");
     //    benchmarkBFS(bfs_beamerGAP_P, originalGraph, "bfs_beamerGAP_P");
-    benchmarkBFS(bfs_claude_chaotic_P, originalGraph, "bfs_claude_chaotic_P");
-    //    benchmarkBFS(bfs_claude_fine_lock_P, originalGraph, "bfs_claude_fine_lock_P");
-    benchmarkBFS(bfs_claude_bags_P, originalGraph, "bfs_claude_bags_P");
-    benchmarkBFS(bfs_claude_work_stealing_P, originalGraph, "bfs_claude_work_stealing_P");
+    benchmarkBFS(bfs_claude_chaotic_P, originalGraph, "bfs_Claude-4.1-Opus_chaotic_P");
+    //    benchmarkBFS(bfs_claude_fine_lock_P, originalGraph, "bfs_Claude-4.1-Opus_fine_lock_P");
+    benchmarkBFS(bfs_claude_bags_P, originalGraph, "bfs_Claude-4.1-Opus_bags_P");
+    benchmarkBFS(bfs_claude_work_stealing_P, originalGraph, "bfs_Claude-4.1-Opus_work_stealing_P");
     goto done;
   }
 #endif
