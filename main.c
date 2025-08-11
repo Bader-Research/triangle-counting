@@ -446,7 +446,7 @@ main(int argc, char **argv) {
     benchmarkBFS(bfs_claude_chaotic_P, originalGraph, "bfs_claude_chaotic_P");
     //    benchmarkBFS(bfs_claude_fine_lock_P, originalGraph, "bfs_claude_fine_lock_P");
     benchmarkBFS(bfs_claude_bags_P, originalGraph, "bfs_claude_bags_P");
-    // benchmarkBFS(bfs_claude_work_stealing_P, originalGraph, "bfs_claude_work_stealing_P");
+    benchmarkBFS(bfs_claude_work_stealing_P, originalGraph, "bfs_claude_work_stealing_P");
     goto done;
   }
 #endif

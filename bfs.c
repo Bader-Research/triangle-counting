@@ -1001,7 +1001,6 @@ void bfs_claude_chaotic_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UIN
 #endif
 
 
-
 #ifdef PARALLEL
 
 void bfs_claude_fine_lock_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
@@ -1018,15 +1017,22 @@ void bfs_claude_fine_lock_P(const GRAPH_TYPE *graph, const UINT_t startVertex, U
     visited[startVertex] = true;
     level[startVertex] = 0;
     
-    // Multiple queues, one per thread
+    // Multiple queues with locks, one per thread
     int max_threads = omp_get_max_threads();
     Queue** queues = (Queue**)malloc(max_threads * sizeof(Queue*));
     assert_malloc(queues);
+    omp_lock_t* queue_locks = (omp_lock_t*)malloc(max_threads * sizeof(omp_lock_t));
+    assert_malloc(queue_locks);
+    
     for (int i = 0; i < max_threads; i++) {
         queues[i] = createQueue(n);
+        omp_init_lock(&queue_locks[i]);
     }
     
+    // Add start vertex to first queue
+    omp_set_lock(&queue_locks[0]);
     enqueue(queues[0], startVertex);
+    omp_unset_lock(&queue_locks[0]);
     
     #pragma omp parallel
     {
@@ -1041,24 +1047,38 @@ void bfs_claude_fine_lock_P(const GRAPH_TYPE *graph, const UINT_t startVertex, U
             for (int q = 0; q < num_threads; q++) {
                 int qid = (tid + q) % num_threads;
                 
+                // Try to get work from this queue
+                UINT_t u;
+                bool got_vertex = false;
+                
+                omp_set_lock(&queue_locks[qid]);
                 if (!isEmpty(queues[qid])) {
-                    UINT_t u = dequeue(queues[qid]);
+                    u = dequeue(queues[qid]);
+                    got_vertex = true;
+                }
+                omp_unset_lock(&queue_locks[qid]);
+                
+                if (got_vertex) {
                     did_work = true;
                     rounds_without_work = 0;
                     
+                    // Process neighbors
                     for (UINT_t i = Ap[u]; i < Ap[u + 1]; i++) {
                         UINT_t v = Ai[i];
                         
-                        // Use compare-and-swap for thread safety
+                        // Use compare-and-swap for thread safety on visited array
                         bool expected = false;
                         if (__sync_bool_compare_and_swap(&visited[v], expected, true)) {
                             level[v] = level[u] + 1;
+                            
                             // Add to a queue (distribute by vertex number)
                             int target_queue = v % num_threads;
+                            omp_set_lock(&queue_locks[target_queue]);
                             enqueue(queues[target_queue], v);
+                            omp_unset_lock(&queue_locks[target_queue]);
                         }
                     }
-                    break;  // Process one vertex at a time
+                    break;  // Process one vertex at a time before checking queues again
                 }
             }
             
@@ -1066,17 +1086,17 @@ void bfs_claude_fine_lock_P(const GRAPH_TYPE *graph, const UINT_t startVertex, U
                 rounds_without_work++;
             }
             
-            // Small delay to prevent spinning
-            if (!did_work) {
-                #pragma omp barrier
-            }
+            // Synchronization point to check if all threads are done
+            #pragma omp barrier
         }
     }
     
     // Cleanup
     for (int i = 0; i < max_threads; i++) {
+        omp_destroy_lock(&queue_locks[i]);
         free_queue(queues[i]);
     }
+    free(queue_locks);
     free(queues);
 }
 
@@ -1215,8 +1235,26 @@ bool push_back_deque(Deque* d, UINT_t item) {
     omp_set_lock(&d->lock);
     UINT_t next_tail = (d->tail + 1) % d->capacity;
     if (next_tail == d->head) {
-        omp_unset_lock(&d->lock);
-        return false;
+        // Deque is full - resize it
+        UINT_t old_capacity = d->capacity;
+        UINT_t new_capacity = old_capacity * 2;
+        UINT_t* new_items = (UINT_t*)malloc(new_capacity * sizeof(UINT_t));
+        assert_malloc(new_items);
+        
+        // Copy elements to new array
+        UINT_t count = 0;
+        UINT_t curr = d->head;
+        while (curr != d->tail) {
+            new_items[count++] = d->items[curr];
+            curr = (curr + 1) % old_capacity;
+        }
+        
+        free(d->items);
+        d->items = new_items;
+        d->capacity = new_capacity;
+        d->head = 0;
+        d->tail = count;
+        next_tail = count + 1;
     }
     d->items[d->tail] = item;
     d->tail = next_tail;
@@ -1255,46 +1293,73 @@ bool is_deque_empty(Deque* d) {
     return empty;
 }
 
+// Simple thread-safe linear congruential generator
+static inline unsigned int thread_safe_rand(unsigned int* seed) {
+    *seed = (*seed * 1103515245u + 12345u) & 0x7fffffff;
+    return *seed;
+}
+
 void bfs_claude_work_stealing_P(const GRAPH_TYPE *graph, const UINT_t startVertex, UINT_t* level, bool* visited) {
     const UINT_t n = graph->numVertices;
     UINT_t* Ap = graph->rowPtr;
     UINT_t* Ai = graph->colInd;
     
+    // Initialize arrays
+    for (UINT_t i = 0; i < n; i++) {
+        visited[i] = false;
+        level[i] = UINT_MAX;
+    }
+    
     int num_threads = omp_get_max_threads();
     Deque** local_deques = (Deque**)malloc(num_threads * sizeof(Deque*));
     assert_malloc(local_deques);
     
+    // Create deques with reasonable initial capacity
     for (int i = 0; i < num_threads; i++) {
-        local_deques[i] = create_deque(n / num_threads + 1000);
+        local_deques[i] = create_deque(1024);  // Start small, will resize as needed
     }
     
     visited[startVertex] = true;
     level[startVertex] = 0;
     push_back_deque(local_deques[0], startVertex);
     
+    // Shared termination flag
+    volatile int active_threads = num_threads;
+    
     #pragma omp parallel
     {
         int tid = omp_get_thread_num();
-        unsigned int seed = (unsigned int)time(NULL) + tid;
-        volatile bool global_done = false;
-	srand(seed);
+        unsigned int seed = (unsigned int)(tid * 1000 + 1);  // Thread-specific seed
+        int consecutive_steal_fails = 0;
+        bool thread_active = true;
         
-        while (!global_done) {
+        while (thread_active) {
             UINT_t u;
             bool got_work = false;
             
             // Try local work first
             if (pop_front_deque(local_deques[tid], &u)) {
                 got_work = true;
-            } else {
-                // Try to steal from random victim
-                int victim = rand() % num_threads;
-                if (victim != tid && pop_back_deque(local_deques[victim], &u)) {
-                    got_work = true;
+                consecutive_steal_fails = 0;
+            } else if (consecutive_steal_fails < num_threads * 2) {
+                // Try to steal from a random victim
+                int attempts = 0;
+                while (!got_work && attempts < num_threads) {
+                    int victim = thread_safe_rand(&seed) % num_threads;
+                    if (victim != tid && pop_back_deque(local_deques[victim], &u)) {
+                        got_work = true;
+                        consecutive_steal_fails = 0;
+                    }
+                    attempts++;
+                }
+                
+                if (!got_work) {
+                    consecutive_steal_fails++;
                 }
             }
             
             if (got_work) {
+                // Process the vertex
                 for (UINT_t i = Ap[u]; i < Ap[u + 1]; i++) {
                     UINT_t v = Ai[i];
                     
@@ -1306,25 +1371,43 @@ void bfs_claude_work_stealing_P(const GRAPH_TYPE *graph, const UINT_t startVerte
                 }
             }
             
-            #pragma omp barrier
-            #pragma omp single
-            {
-                global_done = true;
-                for (int t = 0; t < num_threads; t++) {
-                    if (!is_deque_empty(local_deques[t])) {
-                        global_done = false;
-                        break;
+            // Check for global termination
+            if (!got_work && consecutive_steal_fails >= num_threads * 2) {
+                #pragma omp barrier
+                
+                // Check if any thread has work
+                #pragma omp single
+                {
+                    bool any_work = false;
+                    for (int t = 0; t < num_threads; t++) {
+                        if (!is_deque_empty(local_deques[t])) {
+                            any_work = true;
+                            break;
+                        }
                     }
+                    if (!any_work) {
+                        active_threads = 0;  // Signal all threads to stop
+                    }
+                }
+                
+                #pragma omp barrier
+                
+                if (active_threads == 0) {
+                    thread_active = false;
+                } else {
+                    consecutive_steal_fails = 0;  // Reset and try again
                 }
             }
         }
     }
     
+    // Cleanup
     for (int i = 0; i < num_threads; i++) {
         destroy_deque(local_deques[i]);
     }
     free(local_deques);
 }
+
 #endif
 
 #endif
